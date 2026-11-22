@@ -19,7 +19,10 @@ var log = logging.CreateLogger("MatchPulse");
 
 var config = Config.Load(configPath);
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-var dispatcher = new EventDispatcher(config.Webhooks.Select(url => new WebhookSink(http, url)), log);
+var dispatcher = new EventDispatcher(
+    config.Webhooks.Select(url => (IEventSink)new WebhookSink(http, url))
+        .Concat((config.Scripts ?? []).Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10)))),
+    log);
 
 if (video is null)
 {
@@ -30,7 +33,7 @@ if (video is null)
 else
 {
     var detector = new MatchDetector(log);
-    log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s)", video, config.ChecksPerSecond, config.Webhooks.Count);
+    log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s) and {Scripts} script(s)", video, config.ChecksPerSecond, config.Webhooks.Count, config.Scripts?.Count ?? 0);
     foreach (var frame in ReplayFrameSource.Read(video, DateTimeOffset.Now, config.ChecksPerSecond))
         using (frame.Image)
             foreach (var gameEvent in detector.Process(frame))

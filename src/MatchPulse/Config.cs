@@ -2,8 +2,9 @@ using System.Text.Json;
 
 namespace MatchPulse;
 
-/// <summary>Local config file, for example <c>{ "webhooks": ["http://localhost:8080/bf6"], "checksPerSecond": 10 }</c>.</summary>
-public sealed record Config(IReadOnlyList<Uri> Webhooks, double ChecksPerSecond = 10)
+/// <summary>Local config file, for example <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["pwsh -File C:\obs.ps1"], "checksPerSecond": 10 }</c>.
+/// Each script is a command line run through <c>cmd.exe /c</c> once per Game Event.</summary>
+public sealed record Config(IReadOnlyList<Uri> Webhooks, double ChecksPerSecond = 10, IReadOnlyList<string>? Scripts = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
