@@ -11,58 +11,100 @@ public class KillDetectionTests
     [Fact]
     public void Kill_Badge_held_across_many_checks_yields_one_kill_at_first_sight()
     {
-        var events = Run(Blank(3), WithBadges(20, "kill_badge"), Blank(5));
+        var events = Run(Blank(3), KillMarker(2), WithBadges(20, "kill_badge"), Blank(5));
 
         var kill = Assert.Single(events);
         Assert.Equal("kill", kill.Type);
         Assert.Equal(1, kill.Sequence);
-        Assert.Equal(Start.AddSeconds(0.3), kill.OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(500), kill.OccurredAt);
     }
 
     [Fact]
     public void Kill_Badge_flickering_for_a_single_check_yields_nothing()
     {
-        Assert.Empty(Run(Blank(3), WithBadges(1, "kill_badge"), Blank(5)));
+        Assert.Empty(Run(Blank(3), KillMarker(2), WithBadges(1, "kill_badge"), Blank(5)));
     }
 
     [Fact]
     public void Knockdown_Badge_yields_no_kill()
     {
-        Assert.Empty(Run(Blank(3), WithBadges(20, "knockdown_badge"), Blank(5)));
+        Assert.Empty(Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(5)));
+    }
+
+    [Fact]
+    public void Kill_Badge_without_a_Kill_Marker_yields_no_kill()
+    {
+        // The Squad finished an opponent the Player knocked down.
+        Assert.Empty(Run(Blank(3), WithBadges(20, "kill_badge"), Blank(5)));
+    }
+
+    [Fact]
+    public void Kill_Badge_long_after_a_Kill_Marker_yields_no_kill()
+    {
+        Assert.Empty(Run(KillMarker(2), Blank(20), WithBadges(20, "kill_badge"), Blank(5)));
     }
 
     [Fact]
     public void Kill_Badge_added_next_to_a_Knockdown_Badge_yields_one_kill()
     {
-        var events = Run(WithBadges(10, "knockdown_badge"), WithBadges(10, "knockdown_badge", "kill_badge"));
+        var events = Run(KillMarker(2), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"));
 
-        Assert.Equal(Start.AddSeconds(1.0), Assert.Single(events).OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(1200), Assert.Single(events).OccurredAt);
     }
 
     [Fact]
     public void Second_Kill_Badge_added_to_the_Score_Popup_yields_a_second_kill()
     {
-        var events = Run(WithBadges(10, "kill_badge"), WithBadges(10, "kill_badge", "kill_badge"));
+        var events = Run(KillMarker(2), WithBadges(8, "kill_badge"), KillMarker(2), WithBadges(10, "kill_badge", "kill_badge"));
 
         Assert.Equal([1, 2], events.Select(e => e.Sequence));
-        Assert.Equal([Start, Start.AddSeconds(1.0)], events.Select(e => e.OccurredAt));
+        Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(1200)], events.Select(e => e.OccurredAt));
         Assert.Single(events.Select(e => e.MatchId).Distinct());
     }
 
     [Fact]
     public void Kill_Badge_in_a_new_Score_Popup_yields_a_new_kill()
     {
-        var events = Run(WithBadges(10, "kill_badge"), Blank(20), WithBadges(10, "kill_badge"));
+        var events = Run(KillMarker(2), WithBadges(10, "kill_badge"), Blank(20), KillMarker(2), WithBadges(10, "kill_badge"));
 
-        Assert.Equal([Start, Start.AddSeconds(3.0)], events.Select(e => e.OccurredAt));
+        Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(3400)], events.Select(e => e.OccurredAt));
     }
 
     [Fact]
     public void Kill_Badge_missed_for_two_checks_is_not_counted_again()
     {
-        var events = Run(WithBadges(10, "kill_badge"), Blank(2), WithBadges(10, "kill_badge"));
+        var events = Run(KillMarker(2), WithBadges(10, "kill_badge"), Blank(2), WithBadges(10, "kill_badge"));
 
         Assert.Single(events);
+    }
+
+    [Fact]
+    public void Kill_counter_flash_after_a_Kill_Marker_without_a_Kill_Badge_yields_one_kill()
+    {
+        // The Kill Badge was missed, for example against a very bright background.
+        var events = Run(Blank(3), KillMarker(2), KillCounterFlash(6), Blank(20));
+
+        Assert.Equal(Start.AddMilliseconds(500), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
+    public void Kill_counter_flash_without_a_Kill_Marker_yields_no_kill()
+    {
+        Assert.Empty(Run(Blank(3), KillCounterFlash(6), Blank(20)));
+    }
+
+    [Fact]
+    public void Kill_counter_flash_with_a_Kill_Badge_yields_one_kill()
+    {
+        var events = Run(Blank(3), KillMarker(2), KillCounterFlash(3), WithBadges(20, "kill_badge"), Blank(5));
+
+        Assert.Equal(Start.AddMilliseconds(800), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
+    public void Kill_counter_flash_after_a_Kill_Badge_yields_no_second_kill()
+    {
+        Assert.Single(Run(Blank(3), KillMarker(2), WithBadges(5, "kill_badge"), KillCounterFlash(6), Blank(20)));
     }
 
     static List<GameEvent> Run(params Mat[][] segments)
@@ -71,7 +113,7 @@ public class KillDetectionTests
         var events = new List<GameEvent>();
         var i = 0;
         foreach (var image in segments.SelectMany(s => s))
-            events.AddRange(detector.Process(new Frame(Start.AddSeconds(i++ * 0.1), image)));
+            events.AddRange(detector.Process(new Frame(Start.AddMilliseconds(i++ * 100), image)));
         return events;
     }
 
@@ -88,6 +130,24 @@ public class KillDetectionTests
             template.CopyTo(frame[new Rect(x, 920, template.Width, template.Height)]);
             x += 48;
         }
+        return Enumerable.Repeat(frame, checks).ToArray();
+    }
+
+    // The red X of the Kill Marker around the crosshair.
+    static Mat[] KillMarker(int checks)
+    {
+        var frame = BlankFrame();
+        using var template = Cv2.ImRead(Path.Combine(Cues, "kill_marker.png"));
+        template.CopyTo(frame[new Rect(1180, 620, template.Width, template.Height)]);
+        return Enumerable.Repeat(frame, checks).ToArray();
+    }
+
+    // The kill counter in the counter bar while it flashes green.
+    static Mat[] KillCounterFlash(int checks)
+    {
+        var frame = BlankFrame();
+        using var template = Cv2.ImRead(Path.Combine(Cues, "kill_counter_flash.png"));
+        template.CopyTo(frame[new Rect(2414, 82, template.Width, template.Height)]);
         return Enumerable.Repeat(frame, checks).ToArray();
     }
 
