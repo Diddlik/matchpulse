@@ -1,0 +1,18 @@
+{
+  "clip": "squad-kill-wipes-players-knock_1108-2157.mkv",
+  "source": {
+    "recording": "2026-11-08 21-57-29.mkv",
+    "start": 103.5,
+    "duration": 3.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "Squad member 'Gabri0Fire' kills the last standing member of an enemy squad at ~1.9 s; the opponent the Player had knocked earlier dies with the squad wipe ('▸BulletWaltz X Terminator73') and the game credits the Player (counter 1->2 at ~2.0 s). No Kill Marker. Per the spec no kill; same open question as knock_squad-finishes."
+}

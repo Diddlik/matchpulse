@@ -1,0 +1,23 @@
+{
+  "clip": "kill_finish-downed_1105-2236.mkv",
+  "source": {
+    "recording": "2026-11-05 22-36-16.mkv",
+    "start": 132.5,
+    "duration": 3.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 1.9,
+      "data": {}
+    }
+  ],
+  "notes": "Player finishes a downed opponent. Kill Marker 1.9-2.0 s, counter 0->1 with green flash at ~2.1 s, Kill Feed '▸BulletWaltz [weapon] [skull] Pierghost747'."
+}

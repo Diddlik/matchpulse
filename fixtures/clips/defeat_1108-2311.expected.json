@@ -1,0 +1,26 @@
+{
+  "clip": "defeat_1108-2311.mkv",
+  "source": {
+    "recording": "2026-11-08 23-11-06.mkv",
+    "start": 702.5,
+    "duration": 6.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 2.5,
+      "data": {
+        "result": "defeat",
+        "reason": "end_screen"
+      }
+    }
+  ],
+  "notes": "Player's squad is wiped. HUD gone at 1.0 s, red 'SQUAD ELIMINIERT' emblem visible only 2.5-4.7 s (one dropped check at 2.6 s), then the summary screen."
+}

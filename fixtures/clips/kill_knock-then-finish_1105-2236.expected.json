@@ -1,0 +1,23 @@
+{
+  "clip": "kill_knock-then-finish_1105-2236.mkv",
+  "source": {
+    "recording": "2026-11-05 22-36-16.mkv",
+    "start": 232.0,
+    "duration": 3.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 2.0,
+      "data": {}
+    }
+  ],
+  "notes": "Player knocks an opponent (Kill Marker at 1.2 s, Kill Feed entry with knockdown chevron) and finishes him about 0.8 s later (weaker Kill Marker ~2.0 s, counter 1->2). Two Kill Marker appearances, one Kill: the knockdown must not produce a kill."
+}
