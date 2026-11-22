@@ -11,9 +11,11 @@ namespace MatchPulse;
 public sealed class MatchDetector
 {
     readonly ILogger _log;
-    readonly Mat _killBadge;
-    readonly Mat _killMarker;
-    readonly Mat? _killCounter;
+    readonly string _gameLanguage;
+    readonly bool _useKillCounterFlash;
+    Size _frameSize;
+    Mat _killBadge = null!, _killMarker = null!;
+    Mat? _killCounter;
     readonly string _matchId = Guid.NewGuid().ToString("N");
     int _sequence;
     bool _inMatch;
@@ -39,17 +41,18 @@ public sealed class MatchDetector
     (DateTimeOffset At, DateTimeOffset Until)? _pendingFlash;
 
     /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
-    public MatchDetector(ILogger? log = null, bool killCounterFlash = true)
+    /// <param name="gameLanguage">Selects the templates of text Cues (<see cref="Config.GameLanguage"/>).</param>
+    public MatchDetector(ILogger? log = null, bool killCounterFlash = true, string gameLanguage = "de")
     {
         _log = log ?? NullLogger.Instance;
-        _killBadge = Cue.KillBadge.LoadTemplate();
-        _killMarker = Cue.KillMarker.LoadTemplate();
-        if (killCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate();
+        _useKillCounterFlash = killCounterFlash;
+        _gameLanguage = gameLanguage;
     }
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
     {
         _inMatch = true;
+        if (frame.Image.Size() != _frameSize) LoadTemplates(frame.Image.Size());
         var events = new List<GameEvent>();
 
         var killMarker = KillMarkerScore(frame.Image) >= Cue.KillMarker.Threshold;
@@ -120,6 +123,15 @@ public sealed class MatchDetector
         if (!_inMatch) return [];
         _inMatch = false;
         return [Emit("match_ended", at, new() { ["result"] = "unknown", ["reason"] = "game_exited" })];
+    }
+
+    // Templates are scaled to the frame size, so they are (re)loaded when it changes.
+    void LoadTemplates(Size frame)
+    {
+        _frameSize = frame;
+        _killBadge = Cue.KillBadge.LoadTemplate(frame, _gameLanguage);
+        _killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
+        if (_useKillCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate(frame, _gameLanguage);
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>
