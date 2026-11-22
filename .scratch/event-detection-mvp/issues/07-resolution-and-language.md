@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 Source material: the two English REDSEC MP4 recordings at 1920×1080 in `samples/` (third-party gameplay, a different player). Verify the Cues on them, then cut English 1080p fixture clips.
 
@@ -43,3 +43,5 @@ Source material: the two English REDSEC MP4 recordings at 1920×1080 in `samples
 - `en_defeat_redsec-en2` stays in `KnownMisses`. It is a ticket 04 follow-up (the defeat shield shows the Player's cosmetic badge), not a language issue, so it does not block criterion 2.
 - Full replay of `samples/...(No Commentary)2.mp4` with game language EN: 3 kills (282.6 s, 850.2 s, 859.2 s). All 3 are real: a red Kill Marker, then a Kill Badge with a tick. The Kill Marker also fired falsely 3 times (red outlines of a loot box at 119 s, an explosion at 1519 s, red lights at 2165 s) but no Kill Badge followed, so no kill came of it. About 20 Kill Badge sightings had no Kill Marker before them and gave no kill; spot checks at 613, 645 and 761 s showed no Kill Marker, so these are Squad credits or other non-kills, not checked further. No `match_ended` was emitted in the whole 36-minute video (known: defeat emblem miss and the direct cut between Matches).
 - **Still colour-based and unverified against game colour settings:** the kill counter flash (green) and the end-screen masks (victory gold, defeat red). If the game lets the Player change those colours, they need the same treatment.
+
+Resolved: all criteria met. Open observation for the Player: replaying the full English sample gave 3 confirmed kills, but about 20 Kill Badge sightings had no Kill Marker before them (squad credits, or kills with a Kill Marker colour other than the configured red in that third-party video). `en_defeat` remains a known miss (follow-up: outline-only defeat emblem mask).
