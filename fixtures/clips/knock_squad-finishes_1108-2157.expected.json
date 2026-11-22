@@ -1,0 +1,18 @@
+{
+  "clip": "knock_squad-finishes_1108-2157.mkv",
+  "source": {
+    "recording": "2026-11-08 21-57-29.mkv",
+    "start": 88.0,
+    "duration": 9.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "Player knocks Max Veltro (Kill Marker at 1.1 s, Kill Feed '▸BulletWaltz [weapon] [chevron] Max Veltro'). Squad member 'Salami taste' finishes him at ~7.4 s. The game then credits the Player: kill counter 0->1 with green flash at 7.5 s and the popup 'KILL BESTÄTIGT'. Per the spec (Kill = Player finishing) this is a Squad kill and yields no kill; OPEN QUESTION for the Player whether a confirmed kill credit should count."
+}

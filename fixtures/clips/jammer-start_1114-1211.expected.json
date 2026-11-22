@@ -1,0 +1,18 @@
+{
+  "clip": "jammer-start_1114-1211.mkv",
+  "source": {
+    "recording": "2026-11-14 12-11-37.mkv",
+    "start": 649.0,
+    "duration": 8.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "The Player walks into an enemy Jammer at ~3.7 s: panel 'STÖRSENDER IN DER NÄHE', minimap 'KEIN SIGNAL' noise, compass glitched, and the counter bar (in-match HUD Cue, kill counter) and Kill Feed disappear. The Jammer lasts ~30 s in the source (652-682 s) and the Match is later won. No kill happens here. The Match must not end; hud_lost must not fire for a Jammer of this length."
+}

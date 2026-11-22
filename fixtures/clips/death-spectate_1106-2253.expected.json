@@ -1,0 +1,18 @@
+{
+  "clip": "death-spectate_1106-2253.mkv",
+  "source": {
+    "recording": "2026-11-06 22-53-38.mkv",
+    "start": 1098.0,
+    "duration": 12.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio (source is 40 Mbit/s 60 fps; -c copy would be ~5 MB/s)",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "Player is downed and dies; in-match HUD absent 4.8-8.7 s, then the Player spectates a Squad member ('BEOBACHTE', 'WARTEN AUF WIEDEREINSATZ') and the counter bar is back (without the kill counter). Must not end the Match."
+}
