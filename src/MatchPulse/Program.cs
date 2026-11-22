@@ -8,7 +8,7 @@ static class Program
 {
     /// <summary>
     /// No arguments: tray app. <c>MatchPulse replay &lt;video&gt; [--config &lt;path&gt;]</c>: replay a recording to the configured Event Sinks.
-    /// Both log to the console and to <see cref="FileLog.DefaultPath"/>.
+    /// <c>MatchPulse live [--config &lt;path&gt;]</c>: run the Game Watcher in the terminal until Ctrl+C. All modes log to the console and to <see cref="FileLog.DefaultPath"/>.
     /// </summary>
     [STAThread]
     static int Main(string[] args)
@@ -18,18 +18,33 @@ static class Program
         using var logging = LoggerFactory.Create(b => b.AddSimpleConsole(o => o.TimestampFormat = "HH:mm:ss.fff ").AddProvider(file));
         var log = logging.CreateLogger("MatchPulse");
 
+        var configPath = args is [.., "--config", var path] ? path : Config.DefaultPath;
         switch (args)
         {
             case []:
                 ApplicationConfiguration.Initialize();
                 Application.Run(new TrayApp(Config.DefaultPath, file.FilePath, log));
                 return 0;
-            case ["replay", var video, ..]:
-                return Replay(video, args is [_, _, "--config", var path] ? path : Config.DefaultPath, log);
+            case ["replay", var video, .. var rest] when rest is [] or ["--config", _]:
+                return Replay(video, configPath, log);
+            case ["live"] or ["live", "--config", _]:
+                return Live(configPath, log);
             default:
-                Console.Error.WriteLine("Usage: MatchPulse [replay <video> [--config <path>]]");
+                Console.Error.WriteLine("Usage: MatchPulse\n       MatchPulse replay <video> [--config <path>]\n       MatchPulse live [--config <path>]");
                 return 2;
         }
+    }
+
+    static int Live(string configPath, ILogger log)
+    {
+        var config = Config.Load(configPath);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var dispatcher = new EventDispatcher(Sinks(config, http), log);
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+        GameWatcher.Run(config.ChecksPerSecond, dispatcher.Dispatch, log, stop.Token);
+        dispatcher.CompleteAsync().GetAwaiter().GetResult();
+        return 0;
     }
 
     static int Replay(string video, string configPath, ILogger log)

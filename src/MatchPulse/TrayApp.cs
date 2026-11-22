@@ -37,7 +37,13 @@ sealed class TrayApp : ApplicationContext
         Status.Changed += _ => _ui.Post(_ => ShowState(), null);
         RefreshTray();
         log.LogInformation("Tray app started, config {Path}", configPath);
+        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, e => Dispatcher.Dispatch(e), log, _stop.Token, Status.SetGameRunning))
+            { IsBackground = true, Name = "Game Watcher" };
+        _watcher.Start();
     }
+
+    readonly CancellationTokenSource _stop = new();
+    readonly Thread _watcher;
 
     public Config Config { get; private set; }
 
@@ -89,6 +95,8 @@ sealed class TrayApp : ApplicationContext
     {
         _tray.Visible = false;
         _tray.Dispose();
+        _stop.Cancel();
+        _watcher.Join(TimeSpan.FromSeconds(5));
         Dispatcher.CompleteAsync().Wait(TimeSpan.FromSeconds(5));
         _http.Dispose();
         base.ExitThreadCore();
