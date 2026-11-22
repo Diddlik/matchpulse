@@ -11,18 +11,35 @@ public class FixtureClipTests
     // Expected offsets were measured on the Kill Marker; the Kill Badge settles 0.4-0.6 s later.
     const double KillBadgeLagTolerance = 0.75;
 
+    static readonly string[] KillClips =
+    [
+        "kill_direct_1108-2157",
+        "kill_finish-downed_1105-2236",
+        "kill_knock-then-finish_1105-2236",
+        "kill_jammer_1119-2047",
+        "knock_squad-finishes_1108-2157",
+        "squad-kill-wipes-players-knock_1108-2157",
+    ];
+
+    // Without the kill counter flash (no REDSEC counter bar), the Kill Badge alone must find every kill.
+    public static TheoryData<string, bool> KillClipsWithAndWithoutCounterFlash()
+    {
+        var data = new TheoryData<string, bool>();
+        foreach (var clip in KillClips)
+        {
+            data.Add(clip, true);
+            data.Add(clip, false);
+        }
+        return data;
+    }
+
     [Theory]
-    [InlineData("kill_direct_1108-2157")]
-    [InlineData("kill_finish-downed_1105-2236")]
-    [InlineData("kill_knock-then-finish_1105-2236")]
-    [InlineData("kill_jammer_1119-2047")]
-    [InlineData("knock_squad-finishes_1108-2157")]
-    [InlineData("squad-kill-wipes-players-knock_1108-2157")]
-    public void Clip_yields_its_expected_kills(string clip)
+    [MemberData(nameof(KillClipsWithAndWithoutCounterFlash))]
+    public void Clip_yields_its_expected_kills(string clip, bool killCounterFlash)
     {
         var expected = ExpectedKillOffsets(clip);
 
-        var kills = Replay(clip).Where(e => e.Type == "kill").ToList();
+        var kills = Replay(clip, killCounterFlash: killCounterFlash).Where(e => e.Type == "kill").ToList();
 
         Assert.Equal(expected.Count, kills.Count);
         foreach (var (offset, kill) in expected.Zip(kills))
@@ -37,9 +54,9 @@ public class FixtureClipTests
         Assert.Empty(Replay(clip, until));
     }
 
-    static List<GameEvent> Replay(string clip, double until = double.MaxValue)
+    static List<GameEvent> Replay(string clip, double until = double.MaxValue, bool killCounterFlash = true)
     {
-        var detector = new MatchDetector();
+        var detector = new MatchDetector(killCounterFlash: killCounterFlash);
         var events = new List<GameEvent>();
         foreach (var frame in ReplayFrameSource.Read(Path.Combine(Clips, clip + ".mkv"), Start, checksPerSecond: 10))
         {

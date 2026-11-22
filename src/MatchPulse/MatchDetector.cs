@@ -13,7 +13,7 @@ public sealed class MatchDetector
     readonly ILogger _log;
     readonly Mat _killBadge;
     readonly Mat _killMarker;
-    readonly Mat _killCounter;
+    readonly Mat? _killCounter;
     readonly string _matchId = Guid.NewGuid().ToString("N");
     int _sequence;
 
@@ -37,12 +37,13 @@ public sealed class MatchDetector
     DateTimeOffset _flashFrom;
     (DateTimeOffset At, DateTimeOffset Until)? _pendingFlash;
 
-    public MatchDetector(ILogger? log = null)
+    /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
+    public MatchDetector(ILogger? log = null, bool killCounterFlash = true)
     {
         _log = log ?? NullLogger.Instance;
         _killBadge = Cue.KillBadge.LoadTemplate();
         _killMarker = Cue.KillMarker.LoadTemplate();
-        _killCounter = Cue.KillCounterFlash.LoadTemplate();
+        if (killCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate();
     }
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
@@ -130,6 +131,7 @@ public sealed class MatchDetector
 
     bool KillCounterFlashes(Mat image)
     {
+        if (_killCounter is null) return false;
         using var region = Cue.KillCounterFlash.Crop(image);
         using var gray = region.CvtColor(ColorConversionCodes.BGR2GRAY);
         using var scores = gray.MatchTemplate(_killCounter, TemplateMatchModes.CCoeffNormed);
