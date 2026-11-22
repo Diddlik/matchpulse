@@ -1,6 +1,6 @@
 # 03: Kill edge cases: Jammer, Squad finishes, counter flash fallback
 
-**What to build:** Kills are reported for the Player only and are not lost in hard cases. A Kill under an active Jammer is still reported from the Kill Badge. When the Squad finishes an opponent the Player knocked down, the game credits a kill but no `kill` is reported. In REDSEC, when the Kill Badge is missed (for example against a very bright background), the kill counter flash shortly after a Kill Marker produces the `kill` instead. Kill detection must keep working without the REDSEC counter bar.
+**What to build:** Kills are reported for the Player only and are not lost in hard cases. A Kill under an active Jammer is still reported from the Kill Badge. When the Squad finishes an opponent the Player knocked down, the game shows the same Kill Badge (with "KILL BESTÄTIGT") but no Kill Marker before it, and no `kill` is reported: a Kill is a Kill Badge within about 1 s after a Kill Marker (finding from ticket 02). In REDSEC, when the Kill Badge is missed (for example against a very bright background), the kill counter flash shortly after a Kill Marker produces the `kill` instead. Kill detection must keep working without the REDSEC counter bar.
 
 **Blocked by:** 02
 
