@@ -32,7 +32,7 @@ _Avoid_: marker, template, indicator
 The in-game list of recent kills and knockdowns shown on the HUD. Its colours depend on the Player's game settings.
 
 **Kill Marker**:
-The red X around the crosshair that appears when the Player knocks down or kills an opponent. It looks the same for both, so on its own it does not prove a Kill. A Kill Marker followed shortly by a Kill Badge does. It is still shown when a Jammer hides the Kill Feed.
+An X around the crosshair that appears when the Player knocks down or kills an opponent. It is red by default; the Player sets its colour in the game settings, and MatchPulse has to be told the same colour. It looks the same for both, so on its own it does not prove a Kill. A Kill Marker followed shortly by a Kill Badge does. It is still shown when a Jammer hides the Kill Feed.
 _Avoid_: hit marker, kill icon, skull
 
 **Score Popup**:

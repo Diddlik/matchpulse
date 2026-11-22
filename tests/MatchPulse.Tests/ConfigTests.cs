@@ -59,4 +59,27 @@ public class ConfigTests
 
         Assert.Throws<InvalidDataException>(() => Config.Load(_path));
     }
+
+    [Fact]
+    public void Kill_Marker_colour_defaults_to_red_and_is_loaded_from_the_file()
+    {
+        Assert.Equal("#FF0000", Config.LoadOrDefault(_path).KillMarkerColor);
+        File.WriteAllText(Directory.CreateDirectory(Path.GetDirectoryName(_path)!).FullName + "/config.json",
+            """{ "webhooks": [], "killMarkerColor": "#00ff00" }""");
+
+        Assert.Equal("#00ff00", Config.Load(_path).KillMarkerColor);
+    }
+
+    [Theory]
+    [InlineData("red")]
+    [InlineData("FF0000")]
+    [InlineData("#FF00")]
+    [InlineData("#GG0000")]
+    public void Kill_Marker_colour_that_is_not_a_hex_RGB_value_is_rejected(string color)
+    {
+        File.WriteAllText(Directory.CreateDirectory(Path.GetDirectoryName(_path)!).FullName + "/config.json",
+            $$"""{ "webhooks": [], "killMarkerColor": "{{color}}" }""");
+
+        Assert.Throws<InvalidDataException>(() => Config.Load(_path));
+    }
 }

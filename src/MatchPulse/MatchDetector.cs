@@ -15,12 +15,13 @@ public sealed class MatchDetector
     readonly string _gameLanguage;
     readonly bool _useKillCounterFlash;
     Size _frameSize;
-    Mat _killBadge = null!, _killMarker = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
+    Mat _killBadge = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
     Mat? _killCounter;
+    Mat[] _killMarker = [];
     readonly TimeSpan _hudLostAfter;
 
     // HSV bands of the colour mask Cues.
-    static readonly (Scalar, Scalar)[] KillMarkerRed = [(new(0, 121, 171), new(8, 255, 255)), (new(172, 121, 171), new(180, 255, 255))];
+    readonly (Scalar, Scalar)[]? _killMarkerBands; // null: Kill Marker colour not distinct, a Kill Badge alone is a kill
     static readonly (Scalar, Scalar)[] VictoryGold = [(new(20, 91, 151), new(36, 255, 255))];
     static readonly (Scalar, Scalar)[] DefeatRed = [(new(0, 91, 151), new(18, 255, 255)), (new(170, 91, 151), new(180, 255, 255))];
 
@@ -43,6 +44,8 @@ public sealed class MatchDetector
     // the Squad finishing the Player's knockdown, or a squad wipe killing it, adds a Kill Badge without one.
     // Measured: 0.4-0.6 s normally, 1.2 s when the Score Popup queues the Kill Badge behind a Knockdown Badge.
     static readonly TimeSpan KillMarkerWindow = TimeSpan.FromSeconds(1.5);
+    // The Kill Marker shrinks to about a third while aiming down sights.
+    static readonly double[] KillMarkerScales = [1.0, 0.7, 0.5, 0.35];
     bool _killMarkerVisible;
     readonly List<DateTimeOffset> _killMarkers = []; // not yet used for a kill; the newest one in the window is used first
 
@@ -55,9 +58,13 @@ public sealed class MatchDetector
     /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
     /// <param name="hudLostAfter">How long the in-match HUD may be absent before the Match ends (default 120 s, longer than a Jammer).</param>
     /// <param name="gameLanguage">Selects the templates of text Cues (<see cref="Config.GameLanguage"/>).</param>
-    public MatchDetector(ILogger? log = null, bool killCounterFlash = true, TimeSpan? hudLostAfter = null, string gameLanguage = "de")
+    /// <param name="killMarkerColor">The Kill Marker colour set in the game (<see cref="Config.KillMarkerColor"/>).</param>
+    public MatchDetector(ILogger? log = null, bool killCounterFlash = true, TimeSpan? hudLostAfter = null, string gameLanguage = "de", string killMarkerColor = "#FF0000")
     {
         _log = log ?? NullLogger.Instance;
+        _killMarkerBands = KillMarkerBands(killMarkerColor);
+        if (_killMarkerBands is null)
+            _log.LogWarning("Kill Marker colour {Color} cannot be told from the white hit marker: every Kill Badge counts as a kill, Squad-finished knockdowns included", killMarkerColor);
         _hudLostAfter = hudLostAfter ?? TimeSpan.FromSeconds(120);
         _useKillCounterFlash = killCounterFlash;
         _gameLanguage = gameLanguage;
@@ -82,8 +89,8 @@ public sealed class MatchDetector
         }
 
         if (hud) _hudSeenAt = frame.Timestamp;
-        var victory = _victory.Update(MaskScore(frame.Image, Cue.EndVictory, _endVictory, VictoryGold) >= Cue.EndVictory.Threshold, frame.Timestamp);
-        var defeat = _defeat.Update(MaskScore(frame.Image, Cue.EndDefeat, _endDefeat, DefeatRed) >= Cue.EndDefeat.Threshold, frame.Timestamp);
+        var victory = _victory.Update(MaskScore(frame.Image, Cue.EndVictory, VictoryGold, _endVictory) >= Cue.EndVictory.Threshold, frame.Timestamp);
+        var defeat = _defeat.Update(MaskScore(frame.Image, Cue.EndDefeat, DefeatRed, _endDefeat) >= Cue.EndDefeat.Threshold, frame.Timestamp);
         if ((victory ?? defeat) is { } endedAt)
         {
             var end = victory is null ? Cue.EndDefeat : Cue.EndVictory;
@@ -96,7 +103,7 @@ public sealed class MatchDetector
             return EndMatch(frame.Timestamp, "unknown", "hud_lost");
         }
 
-        var killMarker = MaskScore(frame.Image, Cue.KillMarker, _killMarker, KillMarkerRed) >= Cue.KillMarker.Threshold;
+        var killMarker = _killMarkerBands is not null && MaskScore(frame.Image, Cue.KillMarker, _killMarkerBands, _killMarker) >= Cue.KillMarker.Threshold;
         if (killMarker && !_killMarkerVisible)
         {
             _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.KillMarker.Name, frame.Timestamp);
@@ -116,10 +123,10 @@ public sealed class MatchDetector
                 var at = _rise[0].At;
                 _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KillBadge.Name, confirmed, at);
                 var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
-                if (marker >= 0)
+                if (marker >= 0 || _killMarkerBands is null)
                 {
                     events.Add(Emit("kill", at));
-                    _killMarkers.RemoveAt(marker);
+                    if (marker >= 0) _killMarkers.RemoveAt(marker);
                     _pendingFlash = null;
                     _badgeKillAt = at;
                 }
@@ -203,7 +210,9 @@ public sealed class MatchDetector
     {
         _frameSize = frame;
         _killBadge = Cue.KillBadge.LoadTemplate(frame, _gameLanguage);
-        _killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
+        using var killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
+        foreach (var scaled in _killMarker) scaled.Dispose();
+        _killMarker = KillMarkerScales.Select(s => killMarker.Resize(new Size(Math.Round(killMarker.Width * s), Math.Round(killMarker.Height * s)), 0, 0, InterpolationFlags.Area)).ToArray();
         if (_useKillCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate(frame, _gameLanguage);
         _inMatchHud = Cue.InMatchHud.LoadTemplate(frame, _gameLanguage);
         _endVictory = Cue.EndVictory.LoadTemplate(frame, _gameLanguage);
@@ -222,8 +231,27 @@ public sealed class MatchDetector
         return max;
     }
 
-    // Matches a binary mask template against the frame pixels that fall in one of the HSV bands.
-    static double MaskScore(Mat image, Cue cue, Mat template, (Scalar Low, Scalar High)[] bands)
+    /// <summary>
+    /// HSV bands of the Kill Marker: hue within 8 of <paramref name="color"/> (#RRGGBB), saturation and value above 120.
+    /// Null when the colour itself is not that saturated and bright (white, grey, dark): then it looks like the white hit marker.
+    /// </summary>
+    public static (Scalar, Scalar)[]? KillMarkerBands(string color)
+    {
+        var rgb = Convert.FromHexString(color[1..]);
+        using var pixel = new Mat(1, 1, MatType.CV_8UC3, new Scalar(rgb[2], rgb[1], rgb[0]));
+        using var hsv = pixel.CvtColor(ColorConversionCodes.BGR2HSV);
+        var (hue, saturation, value) = (hsv.At<Vec3b>(0, 0)[0], hsv.At<Vec3b>(0, 0)[1], hsv.At<Vec3b>(0, 0)[2]);
+        if (saturation <= 120 || value <= 120) return null;
+        int low = hue - 8, high = hue + 8;
+        static Scalar From(int h) => new(h, 121, 121);
+        static Scalar To(int h) => new(h, 255, 255);
+        if (low < 0) return [(From(0), To(high)), (From(180 + low), To(180))];
+        if (high > 179) return [(From(low), To(180)), (From(0), To(high - 180))];
+        return [(From(low), To(high))];
+    }
+
+    // Matches binary mask templates against the frame pixels that fall in one of the HSV bands; the best template counts.
+    static double MaskScore(Mat image, Cue cue, (Scalar Low, Scalar High)[] bands, params Mat[] templates)
     {
         using var region = cue.Crop(image);
         using var hsv = region.CvtColor(ColorConversionCodes.BGR2HSV);
@@ -233,9 +261,12 @@ public sealed class MatchDetector
             using var band = hsv.InRange(low, high);
             Cv2.BitwiseOr(mask, band, mask);
         }
-        using var scores = mask.MatchTemplate(template, TemplateMatchModes.CCorrNormed);
-        scores.MinMaxLoc(out _, out double max);
-        return max;
+        return templates.Max(template =>
+        {
+            using var scores = mask.MatchTemplate(template, TemplateMatchModes.CCorrNormed);
+            scores.MinMaxLoc(out _, out double max);
+            return max;
+        });
     }
 
     bool KillCounterFlashes(Mat image)

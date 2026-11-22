@@ -14,9 +14,9 @@ public class FixtureClipTests
     // Clips without the in-match HUD on screen need a Match that started earlier.
     static readonly string[] StartedMatchClips = ["kill_jammer_1119-2047"];
 
-    // Known misses on the English third-party footage (see ticket 07's comments): its Kill Marker is too dim
-    // for the red mask, and its defeat emblem shows another player's cosmetic badge inside the shield.
-    static readonly string[] KnownMisses = ["en_knock-then-kill_redsec-en2", "en_defeat_redsec-en2"];
+    // Known miss on the English third-party footage (see ticket 07's comments): its defeat emblem shows
+    // another player's cosmetic badge inside the shield.
+    static readonly string[] KnownMisses = ["en_defeat_redsec-en2"];
 
     static IEnumerable<string> ClipNames() =>
         Directory.GetFiles(Clips, "*.expected.json").Select(f => Path.GetFileName(f)[..^".expected.json".Length]).Except(KnownMisses);

@@ -1,10 +1,12 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MatchPulse;
 
 /// <summary>
 /// Local config file, for example
-/// <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["pwsh -File C:\obs.ps1"], "gameLanguage": "de", "uiLanguage": "en", "checksPerSecond": 10, "hudLostAfterSeconds": 120 }</c>.
+/// <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["pwsh -File C:\obs.ps1"], "gameLanguage": "de", "uiLanguage": "en", "checksPerSecond": 10, "hudLostAfterSeconds": 120, "killMarkerColor": "#FF0000" }</c>.
+/// <c>killMarkerColor</c> is the Kill Marker colour set in the game settings, as <c>#RRGGBB</c>.
 /// Each script is a command line run through <c>cmd.exe /s /c "command"</c> once per Game Event.
 /// </summary>
 public sealed record Config(
@@ -13,7 +15,8 @@ public sealed record Config(
     IReadOnlyList<string>? Scripts = null,
     string GameLanguage = "de",
     string UiLanguage = "en",
-    double HudLostAfterSeconds = 120)
+    double HudLostAfterSeconds = 120,
+    string KillMarkerColor = "#FF0000")
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -53,5 +56,7 @@ public sealed record Config(
         if (HudLostAfterSeconds <= 0) throw new InvalidDataException($"{path}: \"hudLostAfterSeconds\" must be positive.");
         if (!Languages.Contains(GameLanguage)) throw new InvalidDataException($"{path}: \"gameLanguage\" must be de or en.");
         if (!Languages.Contains(UiLanguage)) throw new InvalidDataException($"{path}: \"uiLanguage\" must be de or en.");
+        if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
+            throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }
 }
