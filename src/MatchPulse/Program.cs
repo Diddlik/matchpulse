@@ -1,44 +1,76 @@
-using MatchPulse;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
 using Microsoft.Extensions.Logging;
 
-// Usage: MatchPulse replay <video.mkv|mp4> [--config <config.json>]
-//        MatchPulse live [--config <config.json>]
-string? video;
-switch (args)
+namespace MatchPulse;
+
+static class Program
 {
-    case ["replay", var v, .. var rest] when rest is [] or ["--config", _]: video = v; break;
-    case ["live"] or ["live", "--config", _]: video = null; break;
-    default:
-        Console.Error.WriteLine("Usage: MatchPulse replay <video> [--config <path>]\n       MatchPulse live [--config <path>]");
-        return 2;
+    /// <summary>
+    /// No arguments: tray app. <c>MatchPulse replay &lt;video&gt; [--config &lt;path&gt;]</c>: replay a recording to the configured Event Sinks.
+    /// <c>MatchPulse live [--config &lt;path&gt;]</c>: run the Game Watcher in the terminal until Ctrl+C. All modes log to the console and to <see cref="FileLog.DefaultPath"/>.
+    /// </summary>
+    [STAThread]
+    static int Main(string[] args)
+    {
+        AttachConsole(-1); // WinExe: write to the parent terminal's console, if there is one
+        using var file = new FileLog(FileLog.DefaultPath);
+        using var logging = LoggerFactory.Create(b => b.AddSimpleConsole(o => o.TimestampFormat = "HH:mm:ss.fff ").AddProvider(file));
+        var log = logging.CreateLogger("MatchPulse");
+
+        var configPath = args is [.., "--config", var path] ? path : Config.DefaultPath;
+        switch (args)
+        {
+            case []:
+                ApplicationConfiguration.Initialize();
+                Application.Run(new TrayApp(Config.DefaultPath, file.FilePath, log));
+                return 0;
+            case ["replay", var video, .. var rest] when rest is [] or ["--config", _]:
+                return Replay(video, configPath, log);
+            case ["live"] or ["live", "--config", _]:
+                return Live(configPath, log);
+            default:
+                Console.Error.WriteLine("Usage: MatchPulse\n       MatchPulse replay <video> [--config <path>]\n       MatchPulse live [--config <path>]");
+                return 2;
+        }
+    }
+
+    static int Live(string configPath, ILogger log)
+    {
+        var config = Config.Load(configPath);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var dispatcher = new EventDispatcher(Sinks(config, http), log);
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+        GameWatcher.Run(config.ChecksPerSecond, dispatcher.Dispatch, log, stop.Token);
+        dispatcher.CompleteAsync().GetAwaiter().GetResult();
+        return 0;
+    }
+
+    static int Replay(string video, string configPath, ILogger log)
+    {
+        var config = Config.Load(configPath);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var dispatcher = new EventDispatcher(Sinks(config, http), log);
+        var detector = new MatchDetector(log);
+
+        log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s) and {Scripts} script(s)", video, config.ChecksPerSecond, config.Webhooks.Count, config.Scripts.Count);
+        foreach (var frame in ReplayFrameSource.Read(video, DateTimeOffset.Now, config.ChecksPerSecond))
+            using (frame.Image)
+                foreach (var gameEvent in detector.Process(frame))
+                    dispatcher.Dispatch(gameEvent);
+
+        dispatcher.CompleteAsync().GetAwaiter().GetResult();
+        return 0;
+    }
+
+    /// <summary>The Event Sinks the config file asks for.</summary>
+    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http) =>
+        [
+            .. config.Webhooks.Select(url => new WebhookSink(http, url)),
+            .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
+        ];
+
+    [DllImport("kernel32.dll")]
+    static extern bool AttachConsole(int processId);
 }
-var configPath = args is [.., "--config", var path] ? path : Config.DefaultPath;
-
-using var logging = LoggerFactory.Create(b => b.AddSimpleConsole(o => o.TimestampFormat = "HH:mm:ss.fff "));
-var log = logging.CreateLogger("MatchPulse");
-
-var config = Config.Load(configPath);
-using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-var dispatcher = new EventDispatcher(
-    config.Webhooks.Select(url => (IEventSink)new WebhookSink(http, url))
-        .Concat((config.Scripts ?? []).Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10)))),
-    log);
-
-if (video is null)
-{
-    using var stop = new CancellationTokenSource();
-    Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
-    GameWatcher.Run(config.ChecksPerSecond, dispatcher.Dispatch, log, stop.Token);
-}
-else
-{
-    var detector = new MatchDetector(log);
-    log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s) and {Scripts} script(s)", video, config.ChecksPerSecond, config.Webhooks.Count, config.Scripts?.Count ?? 0);
-    foreach (var frame in ReplayFrameSource.Read(video, DateTimeOffset.Now, config.ChecksPerSecond))
-        using (frame.Image)
-            foreach (var gameEvent in detector.Process(frame))
-                dispatcher.Dispatch(gameEvent);
-}
-
-await dispatcher.CompleteAsync();
-return 0;

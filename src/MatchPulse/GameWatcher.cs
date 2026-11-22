@@ -13,8 +13,8 @@ public static class GameWatcher
 {
     static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
 
-    /// <summary>Runs until <paramref name="stop"/> is cancelled.</summary>
-    public static void Run(double checksPerSecond, Action<GameEvent> dispatch, ILogger log, CancellationToken stop)
+    /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.</summary>
+    public static void Run(double checksPerSecond, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -28,6 +28,7 @@ public static class GameWatcher
 
             var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
             log.LogInformation("bf6.exe started on monitor {Monitor}: watching at {Checks} checks/s", monitor, checksPerSecond);
+            gameRunning?.Invoke(true);
             var detector = new MatchDetector(log);
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
@@ -53,6 +54,7 @@ public static class GameWatcher
 
             log.LogInformation("bf6.exe exited: watching stopped");
             foreach (var gameEvent in detector.GameExited(DateTimeOffset.Now)) dispatch(gameEvent);
+            gameRunning?.Invoke(false);
         }
     }
 
