@@ -2,7 +2,8 @@ using OpenCvSharp;
 
 namespace MatchPulse.Tests;
 
-// Synthetic frame sequences: a plain 2560x1440 frame with badge templates pasted into the Score Popup.
+// Synthetic frame sequences: a plain 2560x1440 frame showing the in-match HUD, with badge templates pasted into the Score Popup.
+// Each sequence runs inside a Match that started a second before it.
 public class KillDetectionTests
 {
     static readonly DateTimeOffset Start = new(2026, 11, 22, 20, 0, 0, TimeSpan.FromHours(1));
@@ -15,7 +16,7 @@ public class KillDetectionTests
 
         var kill = Assert.Single(events);
         Assert.Equal("kill", kill.Type);
-        Assert.Equal(1, kill.Sequence);
+        Assert.Equal(2, kill.Sequence);
         Assert.Equal(Start.AddMilliseconds(500), kill.OccurredAt);
     }
 
@@ -57,7 +58,7 @@ public class KillDetectionTests
     {
         var events = Run(KillMarker(2), WithBadges(8, "kill_badge"), KillMarker(2), WithBadges(10, "kill_badge", "kill_badge"));
 
-        Assert.Equal([1, 2], events.Select(e => e.Sequence));
+        Assert.Equal([2, 3], events.Select(e => e.Sequence));
         Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(1200)], events.Select(e => e.OccurredAt));
         Assert.Single(events.Select(e => e.MatchId).Distinct());
     }
@@ -118,9 +119,34 @@ public class KillDetectionTests
         Assert.Equal(Start.AddMilliseconds(500), Assert.Single(events).OccurredAt);
     }
 
+    [Fact]
+    public void Two_Kill_Markers_before_two_Kill_Badges_yield_two_kills()
+    {
+        var events = Run(KillMarker(2), Blank(2), KillMarker(2), WithBadges(5, "kill_badge"), WithBadges(10, "kill_badge", "kill_badge"));
+
+        Assert.Equal([Start.AddMilliseconds(600), Start.AddMilliseconds(1100)], events.Select(e => e.OccurredAt));
+    }
+
+    [Fact]
+    public void Kill_Marker_from_the_previous_Match_yields_no_kill()
+    {
+        var detector = new MatchDetector();
+        var i = 0;
+        IEnumerable<GameEvent> Feed(params Mat[][] segments) =>
+            segments.SelectMany(s => s).SelectMany(image => detector.Process(new Frame(Start.AddMilliseconds(i++ * 100), image))).ToList();
+
+        Feed(Blank(10), KillMarker(2));
+        detector.GameExited(Start.AddSeconds(1.3));
+        var events = Feed(Blank(5), WithBadges(10, "kill_badge"));
+
+        Assert.Equal(["match_started"], events.Select(e => e.Type));
+    }
+
     static List<GameEvent> Run(params Mat[][] segments)
     {
         var detector = new MatchDetector();
+        foreach (var (image, n) in Blank(10).Select((f, n) => (f, n)))
+            detector.Process(new Frame(Start.AddMilliseconds((n - 10) * 100), image));
         var events = new List<GameEvent>();
         var i = 0;
         foreach (var image in segments.SelectMany(s => s))
@@ -162,5 +188,12 @@ public class KillDetectionTests
         return Enumerable.Repeat(frame, checks).ToArray();
     }
 
-    static Mat BlankFrame() => new(1440, 2560, MatType.CV_8UC3, new Scalar(40, 40, 40));
+    // In the middle of a Match: the in-match HUD shows at the left of the counter bar.
+    static Mat BlankFrame()
+    {
+        var frame = new Mat(1440, 2560, MatType.CV_8UC3, new Scalar(40, 40, 40));
+        using var hud = Cv2.ImRead(Path.Combine(Cues, "in_match_hud.png"));
+        hud.CopyTo(frame[new Rect(2190, 80, hud.Width, hud.Height)]);
+        return frame;
+    }
 }
