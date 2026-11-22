@@ -151,9 +151,35 @@ public class KillDetectionTests
         Assert.Equal(["match_started"], events.Select(e => e.Type));
     }
 
-    static List<GameEvent> Run(params Mat[][] segments)
+    [Theory]
+    [InlineData("#00FF00", 1)]
+    [InlineData("#FF0000", 0)]
+    public void Kill_Marker_in_another_colour_is_seen_only_when_that_colour_is_configured(string killMarkerColor, int kills)
     {
-        var detector = new MatchDetector();
+        // The Player set the Kill Marker to green in the game settings.
+        var events = RunWith(new MatchDetector(killMarkerColor: killMarkerColor), Blank(3), KillMarker(2, hueShift: 60), WithBadges(20, "kill_badge"), Blank(5));
+
+        Assert.Equal(kills, events.Count);
+    }
+
+    [Fact]
+    public void Red_Kill_Marker_is_not_seen_when_green_is_configured()
+    {
+        Assert.Empty(RunWith(new MatchDetector(killMarkerColor: "#00FF00"), Blank(3), KillMarker(2), WithBadges(20, "kill_badge"), Blank(5)));
+    }
+
+    [Fact]
+    public void White_Kill_Marker_cannot_be_told_from_the_hit_marker_so_a_Kill_Badge_alone_yields_a_kill()
+    {
+        var events = RunWith(new MatchDetector(killMarkerColor: "#FFFFFF"), Blank(3), WithBadges(20, "kill_badge"), Blank(5));
+
+        Assert.Equal(Start.AddMilliseconds(300), Assert.Single(events).OccurredAt);
+    }
+
+    static List<GameEvent> Run(params Mat[][] segments) => RunWith(new MatchDetector(), segments);
+
+    static List<GameEvent> RunWith(MatchDetector detector, params Mat[][] segments)
+    {
         foreach (var (image, n) in Blank(10).Select((f, n) => (f, n)))
             detector.Process(new Frame(Start.AddMilliseconds((n - 10) * 100), image));
         var events = new List<GameEvent>();
@@ -179,11 +205,19 @@ public class KillDetectionTests
         return Enumerable.Repeat(frame, checks).ToArray();
     }
 
-    // The red X of the Kill Marker around the crosshair.
-    static Mat[] KillMarker(int checks)
+    // The red X of the Kill Marker around the crosshair; a hue shift (OpenCV units, 0-180) recolours it.
+    static Mat[] KillMarker(int checks, int hueShift = 0)
     {
         var frame = BlankFrame();
         using var template = Cv2.ImRead(Path.Combine(Cues, "kill_marker.png"));
+        if (hueShift != 0)
+        {
+            using var hsv = template.CvtColor(ColorConversionCodes.BGR2HSV);
+            var channels = hsv.Split();
+            Cv2.LUT(channels[0], Enumerable.Range(0, 256).Select(h => (byte)((h + hueShift) % 180)).ToArray(), channels[0]);
+            Cv2.Merge(channels, hsv);
+            Cv2.CvtColor(hsv, template, ColorConversionCodes.HSV2BGR);
+        }
         template.CopyTo(frame[new Rect(1180, 620, template.Width, template.Height)]);
         return Enumerable.Repeat(frame, checks).ToArray();
     }

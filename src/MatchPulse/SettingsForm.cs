@@ -1,9 +1,10 @@
 using System.Drawing;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace MatchPulse;
 
-/// <summary>Edits game language, UI language, webhooks and scripts, and shows the log file.</summary>
+/// <summary>Edits game language, Kill Marker colour, UI language, webhooks and scripts, and shows the log file.</summary>
 sealed class SettingsForm : Form
 {
     public SettingsForm(Config config, string logPath, Action<Config> apply)
@@ -15,6 +16,21 @@ sealed class SettingsForm : Form
 
         var gameLanguage = Combo(config.GameLanguage);
         var uiLanguage = Combo(config.UiLanguage);
+        var killMarkerColor = new TextBox { Text = config.KillMarkerColor, Width = 80 };
+        var pick = new Button { Text = "...", AutoSize = true };
+        var hint = new Label { Text = T("KillMarkerNotDistinct"), AutoSize = true, MaximumSize = new Size(580, 0), ForeColor = Color.DarkRed };
+        bool IsColor() => Regex.IsMatch(killMarkerColor.Text, "^#[0-9A-Fa-f]{6}$");
+        void ShowHint() => hint.Visible = IsColor() && MatchDetector.KillMarkerBands(killMarkerColor.Text) is null;
+        killMarkerColor.TextChanged += (_, _) => ShowHint();
+        ShowHint();
+        pick.Click += (_, _) =>
+        {
+            using var dialog = new ColorDialog { FullOpen = true };
+            if (IsColor()) dialog.Color = ColorTranslator.FromHtml(killMarkerColor.Text);
+            if (dialog.ShowDialog(this) == DialogResult.OK) killMarkerColor.Text = $"#{dialog.Color.R:X2}{dialog.Color.G:X2}{dialog.Color.B:X2}";
+        };
+        var colorRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        colorRow.Controls.AddRange([killMarkerColor, pick]);
         var webhooks = Lines(config.Webhooks.Select(u => u.ToString()));
         var scripts = Lines(config.Scripts);
         var save = new Button { Text = T("Save"), AutoSize = true };
@@ -26,6 +42,7 @@ sealed class SettingsForm : Form
                 {
                     GameLanguage = (string)gameLanguage.SelectedItem!,
                     UiLanguage = (string)uiLanguage.SelectedItem!,
+                    KillMarkerColor = killMarkerColor.Text.Trim(),
                     Webhooks = Split(webhooks.Text).Select(line => new Uri(line)).ToList(),
                     Scripts = Split(scripts.Text),
                 });
@@ -39,7 +56,7 @@ sealed class SettingsForm : Form
 
         var form = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(8), AutoScroll = true };
         form.Controls.AddRange([
-            Label(T("GameLanguage")), gameLanguage, Label(T("UiLanguage")), uiLanguage,
+            Label(T("GameLanguage")), gameLanguage, Label(T("KillMarkerColor")), colorRow, hint, Label(T("UiLanguage")), uiLanguage,
             Label(T("Webhooks")), webhooks, Label(T("Scripts")), scripts, save,
         ]);
 

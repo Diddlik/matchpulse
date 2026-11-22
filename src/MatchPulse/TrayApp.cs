@@ -48,7 +48,7 @@ sealed class TrayApp : ApplicationContext
         Status.Changed += _ => _ui.Post(_ => ShowState(), null);
         RefreshTray();
         log.LogInformation("Tray app started, config {Path}", configPath);
-        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, TimeSpan.FromSeconds(Config.HudLostAfterSeconds), Dispatcher.Dispatch, log, _stop.Token, Status.SetGameRunning))
+        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, () => Config.KillMarkerColor, TimeSpan.FromSeconds(Config.HudLostAfterSeconds), Dispatcher.Dispatch, log, _stop.Token, Status.SetGameRunning))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
     }
@@ -71,8 +71,8 @@ sealed class TrayApp : ApplicationContext
         config.Save(_configPath);
         Config = config;
         Dispatcher.ReplaceSinks(Sinks());
-        _log.LogInformation("Settings applied: game language {Language}, {Webhooks} webhook(s), {Scripts} script(s)",
-            config.GameLanguage, config.Webhooks.Count, config.Scripts.Count);
+        _log.LogInformation("Settings applied: game language {Language}, Kill Marker colour {Color}, {Webhooks} webhook(s), {Scripts} script(s)",
+            config.GameLanguage, config.KillMarkerColor, config.Webhooks.Count, config.Scripts.Count);
         RefreshTray();
     }
 
