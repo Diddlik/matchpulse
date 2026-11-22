@@ -15,6 +15,9 @@ public class FixtureClipTests
     [InlineData("kill_direct_1108-2157")]
     [InlineData("kill_finish-downed_1105-2236")]
     [InlineData("kill_knock-then-finish_1105-2236")]
+    [InlineData("kill_jammer_1119-2047")]
+    [InlineData("knock_squad-finishes_1108-2157")]
+    [InlineData("squad-kill-wipes-players-knock_1108-2157")]
     public void Clip_yields_its_expected_kills(string clip)
     {
         var expected = ExpectedKillOffsets(clip);

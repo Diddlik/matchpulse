@@ -12,6 +12,7 @@ public sealed class MatchDetector
 {
     readonly ILogger _log;
     readonly Mat _killBadge;
+    readonly Mat _killMarker;
     readonly string _matchId = Guid.NewGuid().ToString("N");
     int _sequence;
 
@@ -22,15 +23,31 @@ public sealed class MatchDetector
     readonly List<(DateTimeOffset At, int Count)> _rise = [];
     readonly List<int> _fall = [];
 
+    // A Kill Badge is a Kill only shortly after a Kill Marker; the Squad finishing the Player's knockdown shows none.
+    // Measured: 0.4-0.6 s normally, 1.2 s when the Score Popup queues the Kill Badge behind a Knockdown Badge.
+    static readonly TimeSpan KillMarkerWindow = TimeSpan.FromSeconds(1.5);
+    bool _killMarkerVisible;
+    DateTimeOffset _killMarkerAt = DateTimeOffset.MinValue;
+
     public MatchDetector(ILogger? log = null)
     {
         _log = log ?? NullLogger.Instance;
         _killBadge = Cue.KillBadge.LoadTemplate();
+        _killMarker = Cue.KillMarker.LoadTemplate();
     }
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
     {
         var events = new List<GameEvent>();
+
+        var killMarker = KillMarkerScore(frame.Image) >= Cue.KillMarker.Threshold;
+        if (killMarker && !_killMarkerVisible)
+        {
+            _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.KillMarker.Name, frame.Timestamp);
+            _killMarkerAt = frame.Timestamp;
+        }
+        _killMarkerVisible = killMarker;
+
         var count = CountKillBadges(frame.Image);
 
         if (count > _killBadges)
@@ -41,8 +58,9 @@ public sealed class MatchDetector
             {
                 var confirmed = _rise.Min(r => r.Count);
                 _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KillBadge.Name, confirmed, _rise[0].At);
-                for (var i = _killBadges; i < confirmed; i++)
-                    events.Add(Emit("kill", _rise[0].At));
+                if (_rise[0].At - _killMarkerAt <= KillMarkerWindow)
+                    for (var i = _killBadges; i < confirmed; i++)
+                        events.Add(Emit("kill", _rise[0].At));
                 _killBadges = confirmed;
                 _rise.Clear();
             }
@@ -68,6 +86,19 @@ public sealed class MatchDetector
 
     GameEvent Emit(string type, DateTimeOffset at) =>
         new(type, _matchId, ++_sequence, at, new Dictionary<string, string>());
+
+    double KillMarkerScore(Mat image)
+    {
+        using var region = Cue.KillMarker.Crop(image);
+        using var hsv = region.CvtColor(ColorConversionCodes.BGR2HSV);
+        using var low = hsv.InRange(new Scalar(0, 121, 171), new Scalar(8, 255, 255));
+        using var high = hsv.InRange(new Scalar(172, 121, 171), new Scalar(180, 255, 255));
+        using var red = new Mat();
+        Cv2.BitwiseOr(low, high, red);
+        using var scores = red.MatchTemplate(_killMarker, TemplateMatchModes.CCorrNormed);
+        scores.MinMaxLoc(out _, out double max);
+        return max;
+    }
 
     int CountKillBadges(Mat image)
     {
