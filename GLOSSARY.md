@@ -29,12 +29,24 @@ A visual element on screen whose presence tells MatchPulse that something happen
 _Avoid_: marker, template, indicator
 
 **Kill Feed**:
-The in-game list of recent kills shown on the HUD. The Player's name is highlighted there, so the Player's own Kills can be told apart from the Squad's.
+The in-game list of recent kills and knockdowns shown on the HUD. Its colours depend on the Player's game settings.
 
 **Kill Marker**:
-The skull symbol in the centre of the screen that confirms the player's kill. It is still shown when the Kill Feed is hidden by a Jammer.
-_Avoid_: hit marker, kill icon
+The red X around the crosshair that appears when the Player knocks down or kills an opponent. It looks the same for both, so on its own it does not prove a Kill; the Kill Badge does. It is still shown when a Jammer hides the Kill Feed.
+_Avoid_: hit marker, kill icon, skull
+
+**Score Popup**:
+The row of icons with a point total that appears just below the crosshair while the Player earns points. Each new action adds one icon to the row.
+_Avoid_: score display, notification
+
+**Kill Badge**:
+The skull-with-tick icon in the Score Popup that appears when the Player personally finishes an opponent. It is the proof of a Kill.
+_Avoid_: skull, kill icon
+
+**Knockdown Badge**:
+The skull-with-down-arrow icon in the Score Popup that appears when the Player knocks an opponent down.
+_Avoid_: down icon
 
 **Jammer**:
-An in-game effect that hides parts of the HUD, including the Kill Feed.
+An in-game effect that hides parts of the HUD, including the Kill Feed and the counter bar, for roughly 30 to 60 seconds.
 _Avoid_: Störsender (in code and docs)
