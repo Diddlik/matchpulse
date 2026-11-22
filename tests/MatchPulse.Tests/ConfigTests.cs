@@ -29,6 +29,28 @@ public class ConfigTests
         Assert.Equal("en", config.UiLanguage);
     }
 
+    [Theory]
+    [InlineData("""{ "webhooks": [null] }""")]
+    [InlineData("""{ "webhooks": [], "scripts": [null] }""")]
+    [InlineData("""{ "webhooks": [], "scripts": [""] }""")]
+    [InlineData("""{ "webhooks": [], "scripts": ["  "] }""")]
+    public void Null_or_empty_webhook_or_script_is_rejected(string json)
+    {
+        File.WriteAllText(Directory.CreateDirectory(Path.GetDirectoryName(_path)!).FullName + "/config.json", json);
+
+        Assert.Throws<InvalidDataException>(() => Config.Load(_path));
+    }
+
+    [Fact]
+    public void Hud_lost_timeout_defaults_to_120_s_and_is_loaded_from_the_file()
+    {
+        Assert.Equal(120, Config.LoadOrDefault(_path).HudLostAfterSeconds);
+        File.WriteAllText(Directory.CreateDirectory(Path.GetDirectoryName(_path)!).FullName + "/config.json",
+            """{ "webhooks": [], "hudLostAfterSeconds": 300 }""");
+
+        Assert.Equal(300, Config.Load(_path).HudLostAfterSeconds);
+    }
+
     [Fact]
     public void Unknown_game_language_is_rejected()
     {

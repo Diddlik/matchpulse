@@ -109,6 +109,15 @@ public class KillDetectionTests
     }
 
     [Fact]
+    public void Kill_counter_flash_after_a_Kill_Badge_kill_does_not_use_an_older_knockdown_Kill_Marker()
+    {
+        // The knockdown's Kill Marker is still unused when the flash for the Kill Badge kill arrives.
+        var events = Run(KillMarker(2), WithBadges(3, "knockdown_badge"), KillMarker(2), WithBadges(3, "knockdown_badge", "kill_badge"), KillCounterFlash(6), Blank(20));
+
+        Assert.Equal(Start.AddMilliseconds(700), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
     public void Kill_at_1920x1080_yields_the_same_kill_as_at_2560x1440()
     {
         // The game renders the same HUD at a lower 16:9 resolution.
