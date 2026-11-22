@@ -107,3 +107,14 @@ The clips are re-encoded, not cut with `-c copy`. The source is 40 Mbit/s at 60 
 The clips total about 96 MB.
 
 `match_started` at offset 0.0 means the in-match HUD is already visible on the first frame, so a fresh Match Detector starts the Match there. `match_ended` uses `reason: end_screen` for an end recognised from the end-of-match screen. The spec only names the fallback reasons, so ticket 04 should confirm this value.
+
+## Addendum: Score Popup, Kill Badge and Knockdown Badge
+
+Found after the first pass, decided with the Player:
+
+- Just below the crosshair, a **Score Popup** shows one icon per scoring action plus a running point total (around x 0.32–0.50, y 0.60–0.67 of a 2560×1440 frame; the row grows to the left as icons are added, so search a band, not a fixed spot).
+- **Knockdown Badge:** white skull with a down arrow. **Kill Badge:** white skull with a tick. Each icon first appears as a short glitchy square (~0.1–0.2 s) and then settles.
+- The Kill Badge appears only when the Player personally finishes an opponent. When a Squad member finishes the Player's knockdown, no Kill Badge appears; only a "KILLS" label and the counter flash.
+- The Score Popup stays visible under a Jammer (`2026-11-19 20-47-23` at about 1:50: Knockdown Badge, then Kill Badge, while the counter bar is gone). Fixture: `fixtures/clips/kill_jammer_1119-2047`.
+- Decision: the Kill Badge is the primary Kill Cue. The Kill Marker is only a helper signal, the Kill Feed is not used (its colours depend on game settings), and in REDSEC the kill counter flash is a fallback for a missed Kill Badge. No template for the badges exists yet; ticket 02 cuts it.
+- English 1920×1080 REDSEC recordings (MP4, third-party gameplay) were added to `samples/` for ticket 07.

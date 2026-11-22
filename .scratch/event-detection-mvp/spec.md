@@ -8,7 +8,7 @@ I play Battlefield 6, mostly REDSEC (battle royale), and I want other tools to r
 
 ## Solution
 
-MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the screen, recognises fixed HUD cues (match start, match end, the Kill Marker), and announces Game Events such as `match_started`, `kill` and `match_ended` to the Event Sinks I configure: a webhook or a script. MatchPulse records nothing itself. Recording control, for example through OBS, is a consumer of these events (ADR-0001, ADR-0002).
+MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the screen, recognises fixed HUD cues (match start, match end, the Kill Badge), and announces Game Events such as `match_started`, `kill` and `match_ended` to the Event Sinks I configure: a webhook or a script. MatchPulse records nothing itself. Recording control, for example through OBS, is a consumer of these events (ADR-0001, ADR-0002).
 
 ## User Stories
 
@@ -18,8 +18,8 @@ MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the scr
 4. As a player, I want a `match_ended` Game Event when the end of a Match is recognised, so that consumers can stop recording.
 5. As a player, I want `match_ended` to carry a result of `victory`, `defeat` or `unknown`, so that consumers can name or sort recordings.
 6. As a player, I want my own death not to end the Match while I spectate my squad, so that the Match covers the whole game I took part in.
-7. As a player, I want a `kill` Game Event each time I finish an opponent, and none for my Squad's kills, so that consumers can mark highlights.
-8. As a player, I want kills detected from the centre Kill Marker, so that kills are still caught when a Jammer hides the Kill Feed.
+7. As a player, I want a `kill` Game Event each time I personally finish an opponent, and none when my Squad finishes an opponent I knocked down, so that consumers can mark highlights.
+8. As a player, I want kills detected from the Kill Badge in the Score Popup, so that kills are still caught when a Jammer hides the Kill Feed and the counter bar.
 9. As a player, I want one kill to produce exactly one `kill` event, so that consumers don't count it twice.
 10. As a player, I want a Cue that flickers for a single frame to be ignored, so that false events don't reach my tools.
 11. As a player, I want `match_ended` with `result: unknown` and `reason: game_exited` when the game closes mid-Match, so that consumers never wait forever for an end.
@@ -46,32 +46,33 @@ MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the scr
 - **Stack:** .NET 10, a single app project plus one test project. Vortice for DXGI Desktop Duplication, OpenCvSharp for template matching, WinForms only for the tray icon and settings window.
 - **Modules:**
   - **Game Watcher:** detects whether `bf6.exe` is running and on which monitor. It starts and stops the capture loop.
-  - **Frame Source:** delivers frames at 5–10 checks per second, cropped to the Cue regions. There are two implementations: live DXGI capture of the game's monitor, and replay that decodes recorded video files (OBS MKV) directly and samples them at the same rate. There is no separate frame dump format. The detector cannot tell the two apart.
+  - **Frame Source:** delivers frames at 5–10 checks per second, cropped to the Cue regions. There are two implementations: live DXGI capture of the game's monitor, and replay that decodes recorded video files (MKV or MP4) directly and samples them at the same rate. There is no separate frame dump format. The detector cannot tell the two apart.
   - **Match Detector:** the single deep module and the single test seam. It takes timestamped frames and emits Game Events. Internally it holds the Cue matchers, the hysteresis and the Match state (`no_match` → `in_match` → `no_match`). It does no I/O and takes time from the frames, never from the clock.
   - **Event Dispatcher:** fans each Game Event out to all configured Event Sinks. Each sink is isolated: a failure or slow sink is logged and never blocks detection or other sinks.
   - **Event Sinks:** Webhook (HTTP POST, JSON) and Script (process started per event, event JSON on stdin).
   - **Tray UI and settings:** status, game language, sink configuration and log access, in DE and EN.
 - **Cue definitions are data:** each Cue has a region in coordinates relative to the frame, one template per language (or one language-neutral template), a match threshold and a hysteresis count K. Language-neutral Cues (icons, shapes, colours) are preferred over text.
 - **Resolution:** templates are authored at one reference resolution (2560×1440) and scaled to the actual frame size. The MVP supports 16:9 at the default HUD scale only.
-- **Hysteresis:** a Cue counts as seen after K consecutive matching checks. K is set per Cue: higher for match start and end, lower for the short-lived Kill Marker. One Kill Marker appearance produces one `kill`, re-armed only after the marker has disappeared.
-- **Kill detection:** the centre Kill Marker is the primary Cue. When no Jammer is active, a Kill Feed entry with the Player's highlighted name confirms it. With a Jammer active, the Kill Marker alone counts. Squad kills never produce a `kill`.
-- **Match boundaries:** a Match starts when the in-match HUD Cue is confirmed and ends on a confirmed end-of-match Cue. If the in-match HUD has been absent for a configurable time, a fallback `match_ended` with `result: unknown` and `reason: hud_lost` is sent. Player death (down screen, spectating) never ends a Match. A game exit during a Match ends it with `reason: game_exited`.
+- **Hysteresis:** a Cue counts as seen after K consecutive matching checks. K is set per Cue: higher for match start and end, lower for short-lived Cues. One Kill Badge produces one `kill`, even while it stays visible across many checks.
+- **Kill detection:** the Kill Badge is the primary Cue. Each new Kill Badge added to the Score Popup is one `kill`; Knockdown Badges never produce one. The Kill Badge stays visible under a Jammer. The Kill Marker is only a helper signal, because it looks the same on knockdowns. The Kill Feed is not used, because its colours depend on game settings. In REDSEC, the kill counter flash is a secondary source: it produces a `kill` only when a Kill Marker came shortly before and no Kill Badge was seen, for example against a very bright background. A kill credited because the Squad finished the Player's knockdown is not a `kill`.
+- **Match boundaries:** a Match starts when the in-match HUD Cue is confirmed and ends on a confirmed end-of-match Cue. An end recognised from the end-of-match screen carries `reason: end_screen`. If the in-match HUD has been absent for a configurable time (default 120 s, longer than a Jammer), a fallback `match_ended` with `result: unknown` and `reason: hud_lost` is sent. Player death (down screen, spectating) never ends a Match. A game exit during a Match ends it with `reason: game_exited`. Because many Matches are left before the end screen, `result: unknown` is common.
 - **Game Event contract (JSON):** `type` (`match_started` | `kill` | `match_ended`), `matchId` (unique per Match), `sequence` (per Match, starting at 1), `occurredAt` (ISO 8601 local time with offset, time the Cue was first seen), `data` (for `match_ended`: `result` and `reason`). Field names are part of the public contract for consumers.
-- **Prerequisite (POC):** before full implementation, start from the Sample Recordings in `samples/`, add further real REDSEC matches as needed in DE and EN, with and without a Jammer, and confirm which Cues reliably mark match start, match end and result, whether the Kill Marker appears only on finishing an opponent, and that DXGI capture works with the game's display mode. The recorded footage becomes the test fixtures.
+- **Prerequisite (POC):** before full implementation, start from the Sample Recordings in `samples/`, add further real REDSEC matches as needed in DE and EN, with and without a Jammer, and confirm which Cues reliably mark match start, match end and result, and that DXGI capture works with the game's display mode. The recorded footage becomes the test fixtures.
 
 ## Testing Decisions
 
 - **One seam:** the Match Detector. Tests feed it a timestamped frame sequence and assert the exact list of Game Events, with type, order, sequence and result. They never assert internal state, cue scores or which matcher fired.
-- **Sample Recordings:** full REDSEC matches recorded with OBS live in `samples/` in the repo root. They are H.264 MKV files at 2560×1440 and 60 fps, with the game in German, between about 6 and 20 minutes long, about 23 GB in total. They are the starting material for kill detection and the POC. They are too large for version control and stay local only. The first POC step lists what they cover and what further recordings are missing, for example English, a Jammer or a victory.
-- **Fixtures:** short clips of a few seconds cut losslessly from the Sample Recordings and POC recordings, checked into the repo with an expected event list per clip. Cover at least a full Match won and lost, death followed by spectating, a Jammer, DE and EN, two resolutions, and a game exit mid-Match.
-- **Synthetic cases:** short hand-built frame sequences for hysteresis edge cases: a single flicker frame, a Kill Marker held across many checks, two kills close together, and the HUD-lost fallback.
+- **Sample Recordings:** full REDSEC matches recorded with OBS live in `samples/` in the repo root. They are H.264 MKV files at 2560×1440 and 60 fps, with the game in German, between about 6 and 20 minutes long, about 23 GB in total. They are the starting material for kill detection and the POC. Two further recordings are third-party REDSEC gameplay videos in English, MP4 at 1920×1080 and 59.94 fps, about 22 and 36 minutes, played by a different player. They cover English and a second resolution. They are too large for version control and stay local only. The first POC step lists what they cover and what further recordings are missing, for example English, a Jammer or a victory.
+- **Fixtures:** short clips of a few seconds, re-encoded at reduced quality (CRF 26, 30 fps, no audio) to stay small, cut from the Sample Recordings and POC recordings, checked into the repo with an expected event list per clip. Cover at least a full Match won and lost, death followed by spectating, a Jammer, DE and EN, two resolutions, and a game exit mid-Match.
+- **Synthetic cases:** short hand-built frame sequences for hysteresis edge cases: a single flicker frame, a Kill Badge held across many checks, two kills close together, and the HUD-lost fallback.
 - **Not unit-tested:** DXGI capture, Game Watcher, Event Sinks and UI. They are thin and are checked by running the app.
 - **Prior art:** none, the repo is empty.
 
 ## Out of Scope
 
 - Recording video or controlling OBS directly. OBS is driven through a Script sink or a later dedicated consumer, which also owns the post-roll delay and the rule of never stopping a manual recording.
-- Knockdowns, own death, squad events and other events beyond `match_started`, `kill` and `match_ended`.
+- Game modes other than REDSEC, including regular multiplayer. Kill detection must not depend on the REDSEC counter bar, so it can be reused there later.
+- A `knockdown` event (planned next, the Knockdown Badge makes it cheap), own death, squad events and other events beyond `match_started`, `kill` and `match_ended`.
 - Recognising the game mode. A later option is to read it from the start screen.
 - MQTT and RPC sinks. MQTT is the planned next sink.
 - Ultrawide or other aspect ratios, non-default HUD scale, and languages other than DE and EN.
@@ -80,6 +81,6 @@ MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the scr
 
 ## Further Notes
 
-- Some decisions here were proposed in the design session but not explicitly confirmed. I took the recommended answer for each, so check them: the MVP event catalogue, Kill meaning only finishing an opponent, death not ending a Match, Webhook and Script as the first sinks, the event fields, per-Cue hysteresis, the 16:9 reference-resolution scaling, the DE/EN language setting, the `game_exited` reason, DXGI over WGC, and .NET 10 over Rust.
+- The POC findings are in `docs/poc/01-report.md`. Cue regions, thresholds and templates are taken from there.
 - Template matching is tied to HUD layout. Any BF6 patch can break a Cue, so the replay fixtures double as a regression check after updates.
 - See `GLOSSARY.md` for terms and `docs/adr/` for the Overwolf and scope decisions.
