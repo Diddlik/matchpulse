@@ -7,7 +7,7 @@ namespace MatchPulse;
 static class Program
 {
     /// <summary>
-    /// No arguments: tray app. <c>MatchPulse replay &lt;video&gt; [--config &lt;path&gt;]</c>: replay a recording to the configured webhooks.
+    /// No arguments: tray app. <c>MatchPulse replay &lt;video&gt; [--config &lt;path&gt;]</c>: replay a recording to the configured Event Sinks.
     /// Both log to the console and to <see cref="FileLog.DefaultPath"/>.
     /// </summary>
     [STAThread]
@@ -36,10 +36,10 @@ static class Program
     {
         var config = Config.Load(configPath);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        var dispatcher = new EventDispatcher(config.Webhooks.Select(url => new WebhookSink(http, url)), log);
+        var dispatcher = new EventDispatcher(Sinks(config, http), log);
         var detector = new MatchDetector(log);
 
-        log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s)", video, config.ChecksPerSecond, config.Webhooks.Count);
+        log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s) and {Scripts} script(s)", video, config.ChecksPerSecond, config.Webhooks.Count, config.Scripts.Count);
         foreach (var frame in ReplayFrameSource.Read(video, DateTimeOffset.Now, config.ChecksPerSecond))
             using (frame.Image)
                 foreach (var gameEvent in detector.Process(frame))
@@ -48,6 +48,13 @@ static class Program
         dispatcher.CompleteAsync().GetAwaiter().GetResult();
         return 0;
     }
+
+    /// <summary>The Event Sinks the config file asks for.</summary>
+    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http) =>
+        [
+            .. config.Webhooks.Select(url => new WebhookSink(http, url)),
+            .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
+        ];
 
     [DllImport("kernel32.dll")]
     static extern bool AttachConsole(int processId);

@@ -4,7 +4,8 @@ namespace MatchPulse;
 
 /// <summary>
 /// Local config file, for example
-/// <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["C:\obs\mark.cmd"], "gameLanguage": "de", "uiLanguage": "en", "checksPerSecond": 10 }</c>.
+/// <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["pwsh -File C:\obs.ps1"], "gameLanguage": "de", "uiLanguage": "en", "checksPerSecond": 10 }</c>.
+/// Each script is a command line run through <c>cmd.exe /c</c> once per Game Event.
 /// </summary>
 public sealed record Config(
     IReadOnlyList<Uri> Webhooks,

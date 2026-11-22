@@ -47,8 +47,7 @@ sealed class TrayApp : ApplicationContext
     /// <summary>Current Event Dispatcher; replaced when settings are saved, so read it per Game Event.</summary>
     public EventDispatcher Dispatcher { get; private set; }
 
-    // Ticket 06: add one Script sink per Config.Scripts entry here.
-    IEnumerable<IEventSink> Sinks() => [Status, .. Config.Webhooks.Select(url => new WebhookSink(_http, url))];
+    IEnumerable<IEventSink> Sinks() => [Status, .. Program.Sinks(Config, _http)];
 
     void Apply(Config config)
     {
