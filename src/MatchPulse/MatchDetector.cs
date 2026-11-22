@@ -13,6 +13,7 @@ public sealed class MatchDetector
     readonly ILogger _log;
     readonly Mat _killBadge;
     readonly Mat _killMarker;
+    readonly Mat _killCounter;
     readonly string _matchId = Guid.NewGuid().ToString("N");
     int _sequence;
 
@@ -28,12 +29,20 @@ public sealed class MatchDetector
     static readonly TimeSpan KillMarkerWindow = TimeSpan.FromSeconds(1.5);
     bool _killMarkerVisible;
     DateTimeOffset _killMarkerAt = DateTimeOffset.MinValue;
+    DateTimeOffset _badgeKillAt = DateTimeOffset.MinValue;
+
+    // REDSEC fallback for a missed Kill Badge: a kill counter flash after a Kill Marker is held
+    // until the Kill Marker window closes and becomes a kill only if no Kill Badge was seen.
+    int _flashChecks;
+    DateTimeOffset _flashFrom;
+    (DateTimeOffset At, DateTimeOffset Until)? _pendingFlash;
 
     public MatchDetector(ILogger? log = null)
     {
         _log = log ?? NullLogger.Instance;
         _killBadge = Cue.KillBadge.LoadTemplate();
         _killMarker = Cue.KillMarker.LoadTemplate();
+        _killCounter = Cue.KillCounterFlash.LoadTemplate();
     }
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
@@ -59,8 +68,12 @@ public sealed class MatchDetector
                 var confirmed = _rise.Min(r => r.Count);
                 _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KillBadge.Name, confirmed, _rise[0].At);
                 if (_rise[0].At - _killMarkerAt <= KillMarkerWindow)
+                {
                     for (var i = _killBadges; i < confirmed; i++)
                         events.Add(Emit("kill", _rise[0].At));
+                    _badgeKillAt = _rise[0].At;
+                    _pendingFlash = null;
+                }
                 _killBadges = confirmed;
                 _rise.Clear();
             }
@@ -81,6 +94,21 @@ public sealed class MatchDetector
             }
         }
 
+        _flashChecks = KillCounterFlashes(frame.Image) ? _flashChecks + 1 : 0;
+        if (_flashChecks == 1) _flashFrom = frame.Timestamp;
+        if (_flashChecks == Cue.KillCounterFlash.K)
+        {
+            _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.KillCounterFlash.Name, _flashFrom);
+            if (_flashFrom - _killMarkerAt <= KillMarkerWindow && _badgeKillAt < _killMarkerAt)
+                _pendingFlash = (_flashFrom, _killMarkerAt + KillMarkerWindow);
+        }
+
+        if (_pendingFlash is { } flash && frame.Timestamp > flash.Until)
+        {
+            events.Add(Emit("kill", flash.At));
+            _pendingFlash = null;
+        }
+
         return events;
     }
 
@@ -98,6 +126,21 @@ public sealed class MatchDetector
         using var scores = red.MatchTemplate(_killMarker, TemplateMatchModes.CCorrNormed);
         scores.MinMaxLoc(out _, out double max);
         return max;
+    }
+
+    bool KillCounterFlashes(Mat image)
+    {
+        using var region = Cue.KillCounterFlash.Crop(image);
+        using var gray = region.CvtColor(ColorConversionCodes.BGR2GRAY);
+        using var scores = gray.MatchTemplate(_killCounter, TemplateMatchModes.CCoeffNormed);
+        scores.MinMaxLoc(out _, out double max, out _, out Point at);
+        if (max < Cue.KillCounterFlash.Threshold) return false;
+
+        // Most bright pixels of the located skull must be green.
+        using var hsv = new Mat(region, new Rect(at, _killCounter.Size())).CvtColor(ColorConversionCodes.BGR2HSV);
+        using var bright = hsv.InRange(new Scalar(0, 0, 151), new Scalar(180, 255, 255));
+        using var green = hsv.InRange(new Scalar(35, 51, 151), new Scalar(85, 255, 255));
+        return green.CountNonZero() > 0.5 * bright.CountNonZero();
     }
 
     int CountKillBadges(Mat image)

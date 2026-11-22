@@ -78,6 +78,35 @@ public class KillDetectionTests
         Assert.Single(events);
     }
 
+    [Fact]
+    public void Kill_counter_flash_after_a_Kill_Marker_without_a_Kill_Badge_yields_one_kill()
+    {
+        // The Kill Badge was missed, for example against a very bright background.
+        var events = Run(Blank(3), KillMarker(2), KillCounterFlash(6), Blank(20));
+
+        Assert.Equal(Start.AddMilliseconds(500), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
+    public void Kill_counter_flash_without_a_Kill_Marker_yields_no_kill()
+    {
+        Assert.Empty(Run(Blank(3), KillCounterFlash(6), Blank(20)));
+    }
+
+    [Fact]
+    public void Kill_counter_flash_with_a_Kill_Badge_yields_one_kill()
+    {
+        var events = Run(Blank(3), KillMarker(2), KillCounterFlash(3), WithBadges(20, "kill_badge"), Blank(5));
+
+        Assert.Equal(Start.AddMilliseconds(800), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
+    public void Kill_counter_flash_after_a_Kill_Badge_yields_no_second_kill()
+    {
+        Assert.Single(Run(Blank(3), KillMarker(2), WithBadges(5, "kill_badge"), KillCounterFlash(6), Blank(20)));
+    }
+
     static List<GameEvent> Run(params Mat[][] segments)
     {
         var detector = new MatchDetector();
@@ -110,6 +139,15 @@ public class KillDetectionTests
         var frame = BlankFrame();
         using var template = Cv2.ImRead(Path.Combine(Cues, "kill_marker.png"));
         template.CopyTo(frame[new Rect(1180, 620, template.Width, template.Height)]);
+        return Enumerable.Repeat(frame, checks).ToArray();
+    }
+
+    // The kill counter in the counter bar while it flashes green.
+    static Mat[] KillCounterFlash(int checks)
+    {
+        var frame = BlankFrame();
+        using var template = Cv2.ImRead(Path.Combine(Cues, "kill_counter_flash.png"));
+        template.CopyTo(frame[new Rect(2414, 82, template.Width, template.Height)]);
         return Enumerable.Repeat(frame, checks).ToArray();
     }
 

@@ -15,6 +15,9 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// <summary>Red X around the crosshair, matched as a red mask. Shown on knockdowns too, so it only gates the Kill Badge.</summary>
     public static readonly Cue KillMarker = new("kill_marker", "kill_marker_mask.png", new Rect2d(0.4531, 0.4167, 0.0938, 0.1667), 0.3, 1);
 
+    /// <summary>REDSEC kill counter skull in the counter bar, located by shape; it counts only while it flashes green.</summary>
+    public static readonly Cue KillCounterFlash = new("kill_counter_flash", "kill_counter_flash.png", new Rect2d(0.742, 0.042, 0.258, 0.059), 0.7, 2);
+
     public Mat LoadTemplate() =>
         Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "cues", Template), ImreadModes.Grayscale);
 
