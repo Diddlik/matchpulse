@@ -1,0 +1,23 @@
+{
+  "clip": "en_knock-then-kill_redsec-en2.mkv",
+  "source": {
+    "recording": "Battlefield 6 REDSEC Battle Royale Gameplay! (No Commentary)2.mp4",
+    "start": 279.0,
+    "duration": 5.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 1920x1080, yuv420p, no audio (source: third-party upload, 1920x1080 59.94 fps MP4)",
+  "gameLanguage": "en",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 3.0,
+      "data": {}
+    }
+  ],
+  "notes": "English, 1920x1080. Knockdown Badge in the Score Popup from 1.4 s (scores 0.92-0.97 scaled to 1080p). The Player then finishes the opponent through iron sights: Kill Marker 3.0-3.4 s, Kill Badge from 3.6 s (0.89-0.94). Known miss: the Kill Marker in this uploaded video is dim (HSV V about 110-140, below the mask's 171) and thin, so it scores at most 0.2 against the scaled mask and no kill is detected."
+}

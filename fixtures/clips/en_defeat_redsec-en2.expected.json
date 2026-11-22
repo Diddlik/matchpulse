@@ -1,0 +1,26 @@
+{
+  "clip": "en_defeat_redsec-en2.mkv",
+  "source": {
+    "recording": "Battlefield 6 REDSEC Battle Royale Gameplay! (No Commentary)2.mp4",
+    "start": 1092.0,
+    "duration": 7.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 1920x1080, yuv420p, no audio (source: third-party upload, 1920x1080 59.94 fps MP4)",
+  "gameLanguage": "en",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 4.0,
+      "data": {
+        "result": "defeat",
+        "reason": "end_screen"
+      }
+    }
+  ],
+  "notes": "English, 1920x1080. The Player dies at 2.8 s, the red shield emblem above 'SQUAD ELIMINATED' shows from 4.0 s to 6.4 s, then the '7TH PLACE' screen. In the source the video is edited: right after this it cuts straight to the next Match's helicopter intro."
+}
