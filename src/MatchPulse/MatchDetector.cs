@@ -14,6 +14,7 @@ public sealed class MatchDetector
     readonly Mat _killBadge;
     readonly string _matchId = Guid.NewGuid().ToString("N");
     int _sequence;
+    bool _inMatch;
 
     // Kill Badges currently confirmed in the Score Popup, and the runs of checks showing more or fewer than that.
     // Fewer must persist longer, so a badge missed on a bright background for a check or two is not counted again.
@@ -30,6 +31,7 @@ public sealed class MatchDetector
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
     {
+        _inMatch = true;
         var events = new List<GameEvent>();
         var count = CountKillBadges(frame.Image);
 
@@ -66,8 +68,16 @@ public sealed class MatchDetector
         return events;
     }
 
-    GameEvent Emit(string type, DateTimeOffset at) =>
-        new(type, _matchId, ++_sequence, at, new Dictionary<string, string>());
+    /// <summary>The game closed at <paramref name="at"/>: ends a running Match with <c>result: unknown</c>, <c>reason: game_exited</c>.</summary>
+    public IReadOnlyList<GameEvent> GameExited(DateTimeOffset at)
+    {
+        if (!_inMatch) return [];
+        _inMatch = false;
+        return [Emit("match_ended", at, new() { ["result"] = "unknown", ["reason"] = "game_exited" })];
+    }
+
+    GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>
+        new(type, _matchId, ++_sequence, at, data ?? []);
 
     int CountKillBadges(Mat image)
     {

@@ -15,7 +15,10 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     public Mat LoadTemplate() =>
         Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "cues", Template), ImreadModes.Grayscale);
 
-    public Mat Crop(Mat frame) => new(frame, new Rect(
+    public Mat Crop(Mat frame) => new(frame, Region(frame.Size()));
+
+    /// <summary>The search region in pixels of a frame of the given size.</summary>
+    public Rect Region(Size frame) => new(
         (int)(SearchRegion.X * frame.Width), (int)(SearchRegion.Y * frame.Height),
-        (int)(SearchRegion.Width * frame.Width), (int)(SearchRegion.Height * frame.Height)));
+        (int)(SearchRegion.Width * frame.Width), (int)(SearchRegion.Height * frame.Height));
 }
