@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Text.Json;
 using System.Windows.Forms;
 using Microsoft.Extensions.Logging;
 
@@ -7,6 +8,7 @@ namespace MatchPulse;
 /// <summary>
 /// The tray icon and settings window. Saving settings writes the config file and rebuilds the Event Sinks,
 /// so changes apply without a restart. Detection dispatches through <see cref="Dispatcher"/>.
+/// An invalid config file is logged and reported, and defaults apply until settings are saved.
 /// </summary>
 sealed class TrayApp : ApplicationContext
 {
@@ -31,13 +33,22 @@ sealed class TrayApp : ApplicationContext
         _logPath = logPath;
         _log = log;
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-        Config = Config.LoadOrDefault(configPath);
+        try
+        {
+            Config = Config.LoadOrDefault(configPath);
+        }
+        catch (Exception e) when (e is InvalidDataException or JsonException or IOException or UnauthorizedAccessException)
+        {
+            log.LogError(e, "Config {Path} is invalid; using defaults", configPath);
+            Config = new Config([]);
+            MessageBox.Show($"{Ui.T(Config.UiLanguage, "ConfigInvalid")}\n\n{configPath}\n{e.Message}", "MatchPulse", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
         Dispatcher = new EventDispatcher(Sinks(), log);
         _tray.DoubleClick += (_, _) => ShowSettings();
         Status.Changed += _ => _ui.Post(_ => ShowState(), null);
         RefreshTray();
         log.LogInformation("Tray app started, config {Path}", configPath);
-        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, e => Dispatcher.Dispatch(e), log, _stop.Token, Status.SetGameRunning))
+        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, TimeSpan.FromSeconds(Config.HudLostAfterSeconds), Dispatcher.Dispatch, log, _stop.Token, Status.SetGameRunning))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
     }
@@ -50,8 +61,8 @@ sealed class TrayApp : ApplicationContext
     /// <summary>Tray state. The Game Watcher (ticket 05) calls <see cref="AppStatus.SetGameRunning"/> on it.</summary>
     public AppStatus Status { get; } = new();
 
-    /// <summary>Current Event Dispatcher; replaced when settings are saved, so read it per Game Event.</summary>
-    public EventDispatcher Dispatcher { get; private set; }
+    /// <summary>The Event Dispatcher; its Event Sinks are replaced when settings are saved.</summary>
+    public EventDispatcher Dispatcher { get; }
 
     IEnumerable<IEventSink> Sinks() => [Status, .. Program.Sinks(Config, _http)];
 
@@ -59,9 +70,7 @@ sealed class TrayApp : ApplicationContext
     {
         config.Save(_configPath);
         Config = config;
-        var old = Dispatcher;
-        Dispatcher = new EventDispatcher(Sinks(), _log);
-        _ = old.CompleteAsync();
+        Dispatcher.ReplaceSinks(Sinks());
         _log.LogInformation("Settings applied: game language {Language}, {Webhooks} webhook(s), {Scripts} script(s)",
             config.GameLanguage, config.Webhooks.Count, config.Scripts.Count);
         RefreshTray();

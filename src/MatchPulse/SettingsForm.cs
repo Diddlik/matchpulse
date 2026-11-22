@@ -31,7 +31,7 @@ sealed class SettingsForm : Form
                 });
                 MessageBox.Show(this, T("Saved"), Text);
             }
-            catch (Exception e) when (e is UriFormatException or InvalidDataException)
+            catch (Exception e) when (e is UriFormatException or InvalidDataException or IOException or UnauthorizedAccessException)
             {
                 MessageBox.Show(this, e.Message, T("Invalid"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }

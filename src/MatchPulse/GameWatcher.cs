@@ -14,8 +14,9 @@ public static class GameWatcher
     static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
 
     /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.
-    /// <paramref name="gameLanguage"/> is read each time <c>bf6.exe</c> starts, so a changed setting applies from the next game run without restarting MatchPulse.</summary>
-    public static void Run(double checksPerSecond, Func<string> gameLanguage, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
+    /// <paramref name="gameLanguage"/> is read each time <c>bf6.exe</c> starts, so a changed setting applies from the next game run without restarting MatchPulse.
+    /// When stopped during a Match, <c>match_ended</c> with <c>reason: stopped</c> is dispatched before returning.</summary>
+    public static void Run(double checksPerSecond, Func<string> gameLanguage, TimeSpan hudLostAfter, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -30,7 +31,7 @@ public static class GameWatcher
             var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
             log.LogInformation("bf6.exe started on monitor {Monitor}: watching at {Checks} checks/s", monitor, checksPerSecond);
             gameRunning?.Invoke(true);
-            var detector = new MatchDetector(log, gameLanguage: gameLanguage());
+            var detector = new MatchDetector(log, hudLostAfter: hudLostAfter, gameLanguage: gameLanguage());
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 try
@@ -42,6 +43,12 @@ public static class GameWatcher
                             foreach (var gameEvent in detector.Process(frame)) dispatch(gameEvent);
                             if (frame.Timestamp < nextCheck) continue;
                             if (!IsGameRunning()) break;
+                            if (FindGameWindow() is var moved and not 0 && MonitorFromWindow(moved, MonitorDefaultToNearest) is var now && now != monitor)
+                            {
+                                log.LogInformation("bf6.exe moved to monitor {Monitor}: restarting capture", now);
+                                monitor = now;
+                                break;
+                            }
                             nextCheck = frame.Timestamp + TimeSpan.FromSeconds(1);
                         }
                 }
@@ -51,7 +58,11 @@ public static class GameWatcher
                     stop.WaitHandle.WaitOne(Poll);
                 }
             }
-            if (stop.IsCancellationRequested) return;
+            if (stop.IsCancellationRequested)
+            {
+                foreach (var gameEvent in detector.Stopped(DateTimeOffset.Now)) dispatch(gameEvent);
+                return;
+            }
 
             log.LogInformation("bf6.exe exited: watching stopped");
             foreach (var gameEvent in detector.GameExited(DateTimeOffset.Now)) dispatch(gameEvent);
