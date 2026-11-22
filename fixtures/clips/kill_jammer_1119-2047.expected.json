@@ -1,0 +1,18 @@
+{
+  "clip": "kill_jammer_1119-2047.mkv",
+  "source": {
+    "recording": "2026-11-19 20-47-23.mkv",
+    "start": 108.5,
+    "duration": 4.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "kill",
+      "offset": 2.1,
+      "data": {}
+    }
+  ],
+  "notes": "Jammer active: counter bar and Kill Feed hidden, so no in-match HUD Cue and no match_started from this clip alone. Score Popup still visible: Knockdown Badge at ~1.5 s, Kill Badge at ~2.1 s. One kill, the knockdown must not produce one. A detector that requires an open Match will emit nothing here unless the Match was started earlier; test with an already-started Match."
+}
