@@ -109,6 +109,17 @@ public class KillDetectionTests
     }
 
     [Fact]
+    public void Kill_at_1920x1080_yields_the_same_kill_as_at_2560x1440()
+    {
+        // The game renders the same HUD at a lower 16:9 resolution.
+        static Mat[] At1080p(Mat[] frames) => frames.Select(f => f.Resize(new Size(1920, 1080), 0, 0, InterpolationFlags.Area)).ToArray();
+
+        var events = Run(At1080p(Blank(3)), At1080p(KillMarker(2)), At1080p(WithBadges(20, "kill_badge")), At1080p(Blank(5)));
+
+        Assert.Equal(Start.AddMilliseconds(500), Assert.Single(events).OccurredAt);
+    }
+
+    [Fact]
     public void Two_Kill_Markers_before_two_Kill_Badges_yield_two_kills()
     {
         var events = Run(KillMarker(2), Blank(2), KillMarker(2), WithBadges(5, "kill_badge"), WithBadges(10, "kill_badge", "kill_badge"));

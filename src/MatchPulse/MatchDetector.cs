@@ -12,12 +12,11 @@ namespace MatchPulse;
 public sealed class MatchDetector
 {
     readonly ILogger _log;
-    readonly Mat _killBadge;
-    readonly Mat _killMarker;
-    readonly Mat? _killCounter;
-    readonly Mat _inMatchHud;
-    readonly Mat _endVictory;
-    readonly Mat _endDefeat;
+    readonly string _gameLanguage;
+    readonly bool _useKillCounterFlash;
+    Size _frameSize;
+    Mat _killBadge = null!, _killMarker = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
+    Mat? _killCounter;
     readonly TimeSpan _hudLostAfter;
 
     // HSV bands of the colour mask Cues.
@@ -54,20 +53,18 @@ public sealed class MatchDetector
 
     /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
     /// <param name="hudLostAfter">How long the in-match HUD may be absent before the Match ends (default 120 s, longer than a Jammer).</param>
-    public MatchDetector(ILogger? log = null, bool killCounterFlash = true, TimeSpan? hudLostAfter = null)
+    /// <param name="gameLanguage">Selects the templates of text Cues (<see cref="Config.GameLanguage"/>).</param>
+    public MatchDetector(ILogger? log = null, bool killCounterFlash = true, TimeSpan? hudLostAfter = null, string gameLanguage = "de")
     {
         _log = log ?? NullLogger.Instance;
         _hudLostAfter = hudLostAfter ?? TimeSpan.FromSeconds(120);
-        _killBadge = Cue.KillBadge.LoadTemplate();
-        _killMarker = Cue.KillMarker.LoadTemplate();
-        if (killCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate();
-        _inMatchHud = Cue.InMatchHud.LoadTemplate();
-        _endVictory = Cue.EndVictory.LoadTemplate();
-        _endDefeat = Cue.EndDefeat.LoadTemplate();
+        _useKillCounterFlash = killCounterFlash;
+        _gameLanguage = gameLanguage;
     }
 
     public IReadOnlyList<GameEvent> Process(Frame frame)
     {
+        if (frame.Image.Size() != _frameSize) LoadTemplates(frame.Image.Size());
         var events = new List<GameEvent>();
         var hud = GrayScore(frame.Image, Cue.InMatchHud, _inMatchHud) >= Cue.InMatchHud.Threshold;
 
@@ -191,6 +188,18 @@ public sealed class MatchDetector
         _pendingFlash = null;
         _killMarkers.Remove(flash.KillMarker);
         return Emit("kill", flash.At);
+    }
+
+    // Templates are scaled to the frame size, so they are (re)loaded when it changes.
+    void LoadTemplates(Size frame)
+    {
+        _frameSize = frame;
+        _killBadge = Cue.KillBadge.LoadTemplate(frame, _gameLanguage);
+        _killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
+        if (_useKillCounterFlash) _killCounter = Cue.KillCounterFlash.LoadTemplate(frame, _gameLanguage);
+        _inMatchHud = Cue.InMatchHud.LoadTemplate(frame, _gameLanguage);
+        _endVictory = Cue.EndVictory.LoadTemplate(frame, _gameLanguage);
+        _endDefeat = Cue.EndDefeat.LoadTemplate(frame, _gameLanguage);
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>

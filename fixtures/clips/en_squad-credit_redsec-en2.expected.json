@@ -1,0 +1,18 @@
+{
+  "clip": "en_squad-credit_redsec-en2.mkv",
+  "source": {
+    "recording": "Battlefield 6 REDSEC Battle Royale Gameplay! (No Commentary)2.mp4",
+    "start": 371.5,
+    "duration": 4.5
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 1920x1080, yuv420p, no audio (source: third-party upload, 1920x1080 59.94 fps MP4)",
+  "gameLanguage": "en",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "English, 1920x1080. A Kill Badge with +50 appears in the Score Popup at 1.9 s with no Kill Marker before it (iron sights, no red X): a kill credited for a knockdown the Player did not finish himself. No kill."
+}

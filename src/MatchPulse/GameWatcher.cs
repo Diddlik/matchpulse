@@ -13,8 +13,9 @@ public static class GameWatcher
 {
     static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
 
-    /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.</summary>
-    public static void Run(double checksPerSecond, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
+    /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.
+    /// <paramref name="gameLanguage"/> is read each time <c>bf6.exe</c> starts, so a changed setting applies from the next game run without restarting MatchPulse.</summary>
+    public static void Run(double checksPerSecond, Func<string> gameLanguage, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -29,7 +30,7 @@ public static class GameWatcher
             var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
             log.LogInformation("bf6.exe started on monitor {Monitor}: watching at {Checks} checks/s", monitor, checksPerSecond);
             gameRunning?.Invoke(true);
-            var detector = new MatchDetector(log);
+            var detector = new MatchDetector(log, gameLanguage: gameLanguage());
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 try

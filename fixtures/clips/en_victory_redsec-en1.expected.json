@@ -1,0 +1,26 @@
+{
+  "clip": "en_victory_redsec-en1.mkv",
+  "source": {
+    "recording": "BATTLEFIELD 6 REDSEC BATTLE ROYALE GAMEPLAY! (NO COMMENTARY).mp4",
+    "start": 1279.0,
+    "duration": 9.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 1920x1080, yuv420p, no audio (source: third-party upload, 1920x1080 59.94 fps MP4)",
+  "gameLanguage": "en",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 5.4,
+      "data": {
+        "result": "victory",
+        "reason": "end_screen"
+      }
+    }
+  ],
+  "notes": "English, 1920x1080. The Player is spectating ('SPECTATING') when the Squad wins; the in-match HUD is visible until 3.6 s, then a dark screen, then the gold laurel emblem above 'VICTORY' from 5.4 s. Unlike the German samples the emblem stays only about 3 s (to 8.0 s); then the uploaded video shows the 'WINNERS' outro."
+}

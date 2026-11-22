@@ -5,6 +5,7 @@ namespace MatchPulse;
 /// <summary>
 /// A Cue definition. <see cref="SearchRegion"/> is relative to the frame (x, y, w, h as fractions).
 /// <see cref="Template"/> is a file in the <c>cues</c> folder (copied from <c>fixtures/cues</c>), cut at 2560x1440.
+/// A text Cue puts its per-language templates in <c>cues/&lt;language&gt;/</c>; a language-neutral Cue has one template in <c>cues/</c>.
 /// The Cue counts as seen after <see cref="K"/> consecutive matching checks.
 /// </summary>
 public sealed record Cue(string Name, string Template, Rect2d SearchRegion, double Threshold, int K)
@@ -27,8 +28,17 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// <summary>Red shield emblem of the defeat screen, matched as a red mask. It shows for only about 2 s.</summary>
     public static readonly Cue EndDefeat = new("end_defeat", "end_defeat_mask.png", new Rect2d(0.4375, 0.1528, 0.1250, 0.2778), 0.8, 3);
 
-    public Mat LoadTemplate() =>
-        Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "cues", Template), ImreadModes.Grayscale);
+    public const int ReferenceHeight = 1440;
+
+    /// <summary>The template for <paramref name="language"/>, scaled from 2560x1440 to a 16:9 frame of the given size.</summary>
+    public Mat LoadTemplate(Size frame, string language)
+    {
+        var cues = Path.Combine(AppContext.BaseDirectory, "cues");
+        var path = Path.Combine(cues, language, Template);
+        using var template = Cv2.ImRead(File.Exists(path) ? path : Path.Combine(cues, Template), ImreadModes.Grayscale);
+        var scale = (double)frame.Height / ReferenceHeight;
+        return template.Resize(new Size(Math.Round(template.Width * scale), Math.Round(template.Height * scale)), 0, 0, InterpolationFlags.Area);
+    }
 
     public Mat Crop(Mat frame) => new(frame, Region(frame.Size()));
 

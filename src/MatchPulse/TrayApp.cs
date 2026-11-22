@@ -37,7 +37,7 @@ sealed class TrayApp : ApplicationContext
         Status.Changed += _ => _ui.Post(_ => ShowState(), null);
         RefreshTray();
         log.LogInformation("Tray app started, config {Path}", configPath);
-        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, e => Dispatcher.Dispatch(e), log, _stop.Token, Status.SetGameRunning))
+        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, e => Dispatcher.Dispatch(e), log, _stop.Token, Status.SetGameRunning))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
     }

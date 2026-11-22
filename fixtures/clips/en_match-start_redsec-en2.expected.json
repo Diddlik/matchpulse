@@ -1,0 +1,18 @@
+{
+  "clip": "en_match-start_redsec-en2.mkv",
+  "source": {
+    "recording": "Battlefield 6 REDSEC Battle Royale Gameplay! (No Commentary)2.mp4",
+    "start": 19.0,
+    "duration": 10.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 1920x1080, yuv420p, no audio (source: third-party upload, 1920x1080 59.94 fps MP4)",
+  "gameLanguage": "en",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 6.2,
+      "data": {}
+    }
+  ],
+  "notes": "English, 1920x1080, console player. Helicopter intro; a white transition at 3 s, then the in-match HUD (counter bar top right) appears at 6.2 s over the helicopter view ('3 JUMP LEADER'). In-match HUD template scaled to 1080p scores 0.76-0.89."
+}
