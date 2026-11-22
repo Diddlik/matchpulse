@@ -1,0 +1,23 @@
+{
+  "clip": "kill_then-wipe-credit_1105-2139.mkv",
+  "source": {
+    "recording": "2026-11-05 21-39-33.mkv",
+    "start": 38.5,
+    "duration": 5.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 2.3,
+      "data": {}
+    }
+  ],
+  "notes": "Player knocks vitormourauk (Kill Marker 1.4 s, Knockdown Badge 1.9 s), then kills Floky10452 outright (Kill Marker 2.3 s, Kill Badge 2.9 s), the last of that squad. The knocked vitormourauk dies in the squad wipe ('▸BulletWaltz X vitormourauk') and the game credits a second Kill Badge at 3.2 s without its own Kill Marker. One kill: each Kill Marker confirms at most one Kill Badge. Same open question as squad-kill-wipes-players-knock."
+}

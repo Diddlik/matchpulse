@@ -19,6 +19,7 @@ public class FixtureClipTests
         "kill_jammer_1119-2047",
         "knock_squad-finishes_1108-2157",
         "squad-kill-wipes-players-knock_1108-2157",
+        "kill_then-wipe-credit_1105-2139",
     ];
 
     // Without the kill counter flash (no REDSEC counter bar), the Kill Badge alone must find every kill.

@@ -24,12 +24,12 @@ public sealed class MatchDetector
     readonly List<(DateTimeOffset At, int Count)> _rise = [];
     readonly List<int> _fall = [];
 
-    // A Kill Badge is a Kill only shortly after a Kill Marker; the Squad finishing the Player's knockdown shows none.
+    // A Kill Badge is a Kill only shortly after a Kill Marker, and each Kill Marker confirms at most one kill:
+    // the Squad finishing the Player's knockdown, or a squad wipe killing it, adds a Kill Badge without one.
     // Measured: 0.4-0.6 s normally, 1.2 s when the Score Popup queues the Kill Badge behind a Knockdown Badge.
     static readonly TimeSpan KillMarkerWindow = TimeSpan.FromSeconds(1.5);
     bool _killMarkerVisible;
-    DateTimeOffset _killMarkerAt = DateTimeOffset.MinValue;
-    DateTimeOffset _badgeKillAt = DateTimeOffset.MinValue;
+    DateTimeOffset _killMarkerAt = DateTimeOffset.MinValue; // MinValue once used for a kill
 
     // REDSEC fallback for a missed Kill Badge: a kill counter flash after a Kill Marker is held
     // until the Kill Marker window closes and becomes a kill only if no Kill Badge was seen.
@@ -70,9 +70,8 @@ public sealed class MatchDetector
                 _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KillBadge.Name, confirmed, _rise[0].At);
                 if (_rise[0].At - _killMarkerAt <= KillMarkerWindow)
                 {
-                    for (var i = _killBadges; i < confirmed; i++)
-                        events.Add(Emit("kill", _rise[0].At));
-                    _badgeKillAt = _rise[0].At;
+                    events.Add(Emit("kill", _rise[0].At));
+                    _killMarkerAt = DateTimeOffset.MinValue;
                     _pendingFlash = null;
                 }
                 _killBadges = confirmed;
@@ -100,7 +99,7 @@ public sealed class MatchDetector
         if (_flashChecks == Cue.KillCounterFlash.K)
         {
             _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.KillCounterFlash.Name, _flashFrom);
-            if (_flashFrom - _killMarkerAt <= KillMarkerWindow && _badgeKillAt < _killMarkerAt)
+            if (_flashFrom - _killMarkerAt <= KillMarkerWindow)
                 _pendingFlash = (_flashFrom, _killMarkerAt + KillMarkerWindow);
         }
 
