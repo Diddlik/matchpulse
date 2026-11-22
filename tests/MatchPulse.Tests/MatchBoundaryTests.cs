@@ -23,6 +23,28 @@ public class MatchBoundaryTests
     }
 
     [Fact]
+    public void Stopping_MatchPulse_during_a_Match_yields_match_ended_with_reason_stopped()
+    {
+        var detector = new MatchDetector();
+        Run(detector, Hud(10));
+
+        var ended = Assert.Single(detector.Stopped(Start.AddSeconds(15)));
+
+        Assert.Equal("match_ended", ended.Type);
+        Assert.Equal(Start.AddSeconds(15), ended.OccurredAt);
+        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "stopped" }, ended.Data);
+    }
+
+    [Fact]
+    public void Stopping_MatchPulse_without_a_Match_yields_nothing()
+    {
+        var detector = new MatchDetector();
+        Run(detector, NoHud(10));
+
+        Assert.Empty(detector.Stopped(Start.AddSeconds(10)));
+    }
+
+    [Fact]
     public void Game_exit_without_a_Match_yields_nothing()
     {
         var detector = new MatchDetector();

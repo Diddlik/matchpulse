@@ -31,4 +31,22 @@ public class FileLogTests
         Assert.DoesNotContain("first", File.ReadAllText(path));
         Assert.Contains("second", File.ReadAllText(path));
     }
+
+    [Fact]
+    public void Failed_rotation_keeps_logging_without_throwing()
+    {
+        var path = Path.Combine(_dir, "matchpulse.log");
+        using (var log = new FileLog(path, maxBytes: 100))
+        {
+            var logger = log.CreateLogger("MatchPulse");
+            logger.LogInformation("first {Pad}", new string('a', 100));
+            using (File.Open(Path.Combine(_dir, "matchpulse.1.log"), FileMode.Create, FileAccess.ReadWrite, FileShare.None))
+                logger.LogInformation("second"); // the backup is locked, so rotation fails
+            logger.LogInformation("third");
+        }
+
+        var text = File.ReadAllText(path) + File.ReadAllText(Path.Combine(_dir, "matchpulse.1.log"));
+        Assert.Contains("second", text);
+        Assert.Contains("third", text);
+    }
 }

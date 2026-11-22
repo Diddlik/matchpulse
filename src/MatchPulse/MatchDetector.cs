@@ -50,6 +50,7 @@ public sealed class MatchDetector
     // until the Kill Marker window closes and becomes a kill only if no Kill Badge was seen.
     readonly Hysteresis _flash = new(Cue.KillCounterFlash.K);
     (DateTimeOffset At, DateTimeOffset KillMarker)? _pendingFlash;
+    DateTimeOffset? _badgeKillAt; // a kill counter flash this close to a Kill Badge kill belongs to it
 
     /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
     /// <param name="hudLostAfter">How long the in-match HUD may be absent before the Match ends (default 120 s, longer than a Jammer).</param>
@@ -120,6 +121,7 @@ public sealed class MatchDetector
                     events.Add(Emit("kill", at));
                     _killMarkers.RemoveAt(marker);
                     _pendingFlash = null;
+                    _badgeKillAt = at;
                 }
                 _killBadges = confirmed;
                 _rise.Clear();
@@ -145,7 +147,8 @@ public sealed class MatchDetector
         {
             _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.KillCounterFlash.Name, flashAt);
             var marker = _killMarkers.FindLastIndex(m => flashAt - m <= KillMarkerWindow);
-            if (marker >= 0) _pendingFlash = (flashAt, _killMarkers[marker]);
+            if (_badgeKillAt is { } badgeKill && (flashAt - badgeKill).Duration() <= KillMarkerWindow) _badgeKillAt = null;
+            else if (marker >= 0) _pendingFlash = (flashAt, _killMarkers[marker]);
         }
 
         if (_pendingFlash is { } flash && frame.Timestamp > flash.KillMarker + KillMarkerWindow)
@@ -157,6 +160,10 @@ public sealed class MatchDetector
     /// <summary>The game closed at <paramref name="at"/>: ends a running Match with <c>result: unknown</c>, <c>reason: game_exited</c>.</summary>
     public IReadOnlyList<GameEvent> GameExited(DateTimeOffset at) =>
         _matchId is null ? [] : EndMatch(at, "unknown", "game_exited");
+
+    /// <summary>MatchPulse stopped at <paramref name="at"/>: ends a running Match with <c>result: unknown</c>, <c>reason: stopped</c>.</summary>
+    public IReadOnlyList<GameEvent> Stopped(DateTimeOffset at) =>
+        _matchId is null ? [] : EndMatch(at, "unknown", "stopped");
 
     void StartMatch()
     {
@@ -171,6 +178,7 @@ public sealed class MatchDetector
         _killMarkers.Clear();
         _flash.Reset();
         _pendingFlash = null;
+        _badgeKillAt = null;
     }
 
     // A held kill counter flash belongs to the Match that ends, so it is sent before match_ended.

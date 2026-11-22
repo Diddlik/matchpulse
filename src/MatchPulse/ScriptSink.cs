@@ -3,14 +3,14 @@ using System.Diagnostics;
 namespace MatchPulse;
 
 /// <summary>
-/// Starts one command line (through <c>cmd.exe /c</c>) per Game Event and writes the event JSON to its stdin.
+/// Starts one command line (through <c>cmd.exe /s /c "command"</c>, so quotes in it are kept) per Game Event and writes the event JSON to its stdin.
 /// A non-zero exit code or a run longer than the timeout throws (the process tree is killed) and is logged by the Event Dispatcher.
 /// </summary>
 public sealed class ScriptSink(string command, TimeSpan timeout) : IEventSink
 {
     public async Task SendAsync(GameEvent gameEvent, CancellationToken cancellationToken)
     {
-        using var process = Process.Start(new ProcessStartInfo("cmd.exe", "/c " + command)
+        using var process = Process.Start(new ProcessStartInfo("cmd.exe", $"/s /c \"{command}\"")
         {
             UseShellExecute = false,
             RedirectStandardInput = true,

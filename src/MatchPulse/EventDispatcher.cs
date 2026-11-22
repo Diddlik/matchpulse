@@ -15,30 +15,56 @@ public interface IEventSink
 public sealed class EventDispatcher
 {
     readonly ILogger _log;
-    readonly List<(Channel<GameEvent> Queue, Task Worker)> _sinks;
+    readonly Lock _lock = new();
+    List<(Channel<GameEvent> Queue, Task Worker)> _sinks;
+    readonly List<Task> _replaced = []; // workers of replaced sinks, still delivering their queues
 
     public EventDispatcher(IEnumerable<IEventSink> sinks, ILogger log)
     {
         _log = log;
-        _sinks = sinks.Select(sink =>
-        {
-            var queue = Channel.CreateUnbounded<GameEvent>(new UnboundedChannelOptions { SingleReader = true });
-            return (queue, Task.Run(() => DeliverAsync(sink, queue.Reader)));
-        }).ToList();
+        _sinks = Start(sinks);
     }
 
     public void Dispatch(GameEvent gameEvent)
     {
         _log.LogInformation("Game Event {Json}", gameEvent.ToJson());
-        foreach (var (queue, _) in _sinks) queue.Writer.TryWrite(gameEvent);
+        lock (_lock)
+            foreach (var (queue, _) in _sinks)
+                if (!queue.Writer.TryWrite(gameEvent))
+                    _log.LogWarning("Game Event {Type} #{Sequence} dropped: the Event Dispatcher is complete", gameEvent.Type, gameEvent.Sequence);
+    }
+
+    /// <summary>Sends later Game Events to <paramref name="sinks"/>; events already queued still reach the old sinks.</summary>
+    public void ReplaceSinks(IEnumerable<IEventSink> sinks)
+    {
+        var started = Start(sinks);
+        lock (_lock)
+        {
+            foreach (var (queue, worker) in _sinks)
+            {
+                queue.Writer.TryComplete();
+                _replaced.Add(worker);
+            }
+            _sinks = started;
+        }
     }
 
     /// <summary>Stops accepting events and waits until every sink has handled its queue.</summary>
     public Task CompleteAsync()
     {
-        foreach (var (queue, _) in _sinks) queue.Writer.Complete();
-        return Task.WhenAll(_sinks.Select(s => s.Worker));
+        lock (_lock)
+        {
+            foreach (var (queue, _) in _sinks) queue.Writer.TryComplete();
+            return Task.WhenAll([.. _replaced, .. _sinks.Select(s => s.Worker)]);
+        }
     }
+
+    List<(Channel<GameEvent> Queue, Task Worker)> Start(IEnumerable<IEventSink> sinks) =>
+        sinks.Select(sink =>
+        {
+            var queue = Channel.CreateUnbounded<GameEvent>(new UnboundedChannelOptions { SingleReader = true });
+            return (queue, Task.Run(() => DeliverAsync(sink, queue.Reader)));
+        }).ToList();
 
     async Task DeliverAsync(IEventSink sink, ChannelReader<GameEvent> events)
     {

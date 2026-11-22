@@ -21,14 +21,21 @@ public sealed class FileLog(string path, long maxBytes = 1_000_000) : ILoggerPro
     {
         lock (_lock)
         {
-            _writer ??= Open();
-            if (_writer.BaseStream.Length >= maxBytes)
+            // A log call never throws: a failed rotation keeps writing to the current file, a failed write is dropped.
+            try
             {
-                _writer.Dispose();
-                File.Move(FilePath, Path.ChangeExtension(FilePath, ".1.log"), overwrite: true);
-                _writer = Open();
+                _writer ??= Open();
+                if (_writer.BaseStream.Length >= maxBytes)
+                {
+                    _writer.Dispose();
+                    _writer = null;
+                    try { File.Move(FilePath, Path.ChangeExtension(FilePath, ".1.log"), overwrite: true); }
+                    finally { _writer = Open(); }
+                }
             }
-            _writer.WriteLine(line);
+            catch (Exception) { }
+            try { _writer?.WriteLine(line); }
+            catch (Exception) { }
         }
     }
 

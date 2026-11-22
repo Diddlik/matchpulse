@@ -16,6 +16,8 @@ static class Ui
         ["Saved"] = ("Gespeichert und übernommen.", "Saved and applied."),
         ["Invalid"] = ("Ungültige Einstellungen", "Invalid settings"),
         ["Refresh"] = ("Aktualisieren", "Refresh"),
+        ["ConfigInvalid"] = ("Die Konfigurationsdatei ist ungültig; es gelten die Standardeinstellungen. Speichern in den Einstellungen überschreibt sie.",
+            "The config file is invalid; defaults apply. Saving in Settings overwrites it."),
         [nameof(TrayState.GameNotRunning)] = ("Spiel läuft nicht", "Game not running"),
         [nameof(TrayState.GameRunning)] = ("Spiel läuft", "Game running"),
         [nameof(TrayState.MatchRunning)] = ("Match läuft", "Match running"),

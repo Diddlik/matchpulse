@@ -23,7 +23,7 @@ public static class ReplayFrameSource
         {
             var position = capture.PosMsec;
             if (position + 0.5 < next) continue;
-            next += interval;
+            next = Math.Max(next, position) + interval; // after a timestamp gap, resume sampling from here
 
             var image = new Mat();
             capture.Retrieve(image);
