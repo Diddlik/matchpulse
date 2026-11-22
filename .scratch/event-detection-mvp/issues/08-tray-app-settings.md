@@ -4,10 +4,10 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The tray icon shows one of three states: game not running, game running, Match running
-- [ ] The settings window edits game language, webhook URLs and scripts, and changes take effect without a restart
+- [x] The settings window edits game language, webhook URLs and scripts, and changes take effect without a restart
 - [x] Settings are stored locally and survive a restart
 - [x] The log can be viewed from the settings window
 - [x] UI language DE or EN, selectable
@@ -24,3 +24,5 @@
 - **Wired to 05:** the tray app runs `GameWatcher.Run` on a background thread (stopped on Exit) and dispatches through `TrayApp.Dispatcher`, read per Game Event because it is replaced on save. `GameWatcher.Run` got an optional `gameRunning` callback, which the tray passes as `AppStatus.SetGameRunning`. `match_started`/`match_ended` turn the icon green and back because `AppStatus` is one of the sinks. `MatchPulse live` still runs the Game Watcher in a terminal. `checksPerSecond` is read when the tray app starts.
 - **For 04:** nothing to wire; once `match_started` is emitted, the green icon follows.
 - **For 07 (game language):** the setting is `Config.GameLanguage`. To apply it without a restart, read `Config.GameLanguage` (from `TrayApp.Config`, passed into `GameWatcher.Run`) when building the Match Detector (for example per capture session), or rebuild it in `TrayApp.Apply`.
+
+Resolved after ticket 07: the game language is read each time `bf6.exe` starts, so a change applies from the next game run without restarting MatchPulse; webhooks and scripts apply immediately.
