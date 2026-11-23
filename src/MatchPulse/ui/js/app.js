@@ -67,7 +67,7 @@
   const plugStatus = (p) => (!p.enabled ? 'off' : p.status);
   const psLabel = (id, s) => t(id !== 'obs' && s === 'connected' ? 'ps_connected_mqtt' : 'ps_' + s);
   const soIsFile = (sound) => ['ding', 'double', 'low', 'fanfare'].indexOf(sound) < 0;
-  const plugCls = (s) => (s === 'error' ? 'st-err' : s === 'disconnected' ? 'st-warn' : s === 'off' ? 'st-idle' : 'st-ok');
+  const plugCls = (s) => (s === 'error' ? 'st-err' : s === 'disconnected' || s === 'ruleFailed' ? 'st-warn' : s === 'off' ? 'st-idle' : 'st-ok');
   const sinkStatus = (k) => (k.lastError ? 'err' : k.lastSuccessAt ? 'ok' : 'new');
   const sinkCls = (s) => (s === 'err' ? 'st-err' : s === 'ok' ? 'st-ok' : 'st-idle');
   const sinkError = (k) => (k.lastError ? (k.lastError.code === 'timeout' ? t('err_timeout') : k.lastError.code === 'script_timeout' ? t('err_script') : k.lastError.message) : '');
@@ -79,6 +79,7 @@
     if (S.settings && colorIsBad(S.settings.killMarkerColor)) list.push({ title: t('p_color'), detail: t('p_color_d'), act: 'go', arg: 'setup', action: t('to_setup') });
     const obs = S.plugins.find((p) => p.id === 'obs');
     if (obs && obs.enabled && obs.status === 'error') list.push({ title: t('p_obs'), detail: t('p_obs_d'), act: 'go', arg: 'plugins', action: t('to_plugins') });
+    S.plugins.filter((p) => p.enabled && p.status === 'ruleFailed').forEach((p) => list.push({ title: t('p_rule', { n: t('pl_' + p.id) }), detail: p.lastError || '', act: 'go', arg: 'plugins', action: t('to_plugins') }));
     (S.hostProblems || []).forEach((c) => {
       if (c === 'capture_failed') list.push({ title: t('p_capture'), detail: t('p_capture_d'), act: 'go', arg: 'log', action: t('to_log') });
       if (c === 'config_invalid') list.push({ title: t('p_config'), detail: t('p_config_d') });
@@ -313,7 +314,7 @@
                 <label class="field" style="flex:1 1 180px"><span>${esc(t('obs_pw'))}</span><input class="input" type="password" autocomplete="off" value="${esc(p.config.password)}" data-change="obsPw"></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="obs">${esc(t('obs_test'))}</button>
               </div>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
+              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
             </div>` : p.id === 'wled' ? `
             <div class="stack" style="gap:12px">
@@ -322,12 +323,12 @@
                 <label class="field" style="flex:1 1 260px"><span>${esc(t('wl_host'))}</span><input class="input mono" type="text" placeholder="192.168.1.50" value="${esc(p.config.host)}" data-change="wl" data-key="host"></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="wled">${esc(t('obs_test'))}</button>
               </div>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('wl_err'))}</div>` : ''}
+              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('wl_err'))}</div>` : ''}
               <span class="small muted">${esc(t('wl_hint'))}</span>
             </div>` : p.id === 'sound' ? `
             <div class="stack" style="gap:12px">
               <span class="small muted">${esc(t('so_hint'))}</span>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || '')}</div>` : ''}
+              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || '')}</div>` : ''}
             </div>` : p.id === 'homeassistant' ? `
             <div class="stack" style="gap:12px">
               ${!p.config.mqttEnabled ? `<div class="notice warn row-flex">${WARN_ICON}<span class="small" style="flex:1 1 260px">${esc(t('ha_needs_mqtt'))}</span><button type="button" class="btn s" data-act="plugSel" data-arg="mqtt">${esc(t('ha_to_mqtt'))}</button></div>` : ''}
@@ -336,7 +337,7 @@
                 <label class="field" style="flex:1 1 220px"><span>${esc(t('ha_prefix'))}</span><input class="input mono" type="text" value="${esc(p.config.discoveryPrefix)}" data-change="ha" data-key="discoveryPrefix"></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="homeassistant">${esc(t('ha_send'))}</button>
               </div>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('mq_err'))}</div>` : ''}
+              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('mq_err'))}</div>` : ''}
               <div class="stack-s" style="gap:6px;padding-top:12px;border-top:1px solid var(--border)">
                 <h3>${esc(t('ha_entities'))}</h3>
                 ${[['ha_e_match', 'binary_sensor', 'match'], ['ha_e_kills', 'sensor', 'kills'], ['ha_e_knockdowns', 'sensor', 'knockdowns'], ['ha_e_deaths', 'sensor', 'deaths'], ['ha_e_last', 'sensor', 'last_event']].map(([k, kind, st]) =>
@@ -360,7 +361,7 @@
                 <label class="field" style="flex:0 0 220px"><span>QoS</span><select class="select" data-change="mqNum" data-key="qos">${[0, 1, 2].map((q) => `<option value="${q}" ${p.config.qos === q ? 'selected' : ''}>${esc(t('mq_qos' + q))}</option>`).join('')}</select></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="mqtt">${esc(t('obs_test'))}</button>
               </div>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('mq_err'))}</div>` : ''}
+              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('mq_err'))}</div>` : ''}
               <div class="stack-s" style="gap:6px;padding-top:12px;border-top:1px solid var(--border)">
                 <h3>${esc(t('mq_topics'))}</h3>
                 <div class="row-flex small" style="gap:10px"><span class="mono" style="flex:0 0 260px">${esc(p.config.topicPrefix)}/events/&lt;type&gt;</span><span class="muted">${esc(t('mq_topic_events'))}</span></div>

@@ -59,6 +59,17 @@ public sealed class WledSoundTests
     }
 
     [Fact]
+    public async Task Address_with_scheme_and_slash_is_accepted()
+    {
+        var controller = new Controller();
+        var sink = new WledSink(new HttpClient(controller), new WledSettings(true, " http://192.168.1.50/ ", [new WledRule("r1", "kill", "on")]));
+
+        await sink.SendAsync(Event("kill"), default);
+
+        Assert.Single(controller.Posted);
+    }
+
+    [Fact]
     public async Task Unreachable_controller_fails_the_delivery()
     {
         var sink = new WledSink(new HttpClient(new Controller { Down = true }), Wled(new WledRule("r1", "kill", "on")));
@@ -120,6 +131,8 @@ public sealed class WledSoundTests
                 };
             }
             var body = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!;
+            if (request.Content.Headers.ContentLength is null) // like WLED on an ESP8266: no chunked bodies
+                return new HttpResponseMessage(HttpStatusCode.BadRequest);
             lock (Posted) Posted.Add(body);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"success":true}""") };
         }

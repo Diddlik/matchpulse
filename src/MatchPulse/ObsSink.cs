@@ -17,6 +17,8 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
 {
     public ObsSettings Settings => settings;
 
+    const int ReplayBufferOff = 501; // OBS: OutputNotRunning
+
     public async Task SendAsync(GameEvent gameEvent, CancellationToken cancellationToken)
     {
         var rules = settings.Rules.Where(r => r.Event == gameEvent.Type).ToList();
@@ -30,7 +32,7 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
         foreach (var rule in now)
             try { await RunAsync(session, rule, gameEvent); }
             catch (Exception e) when (e is ObsException) { errors.Add(e); }
-        if (errors.Count > 0) throw new ObsException(string.Join(" ", errors.Select(e => e.Message)));
+        if (errors.Count > 0) throw new ObsException(string.Join(" ", errors.Select(e => e.Message)), errors.OfType<ObsException>().Select(e => e.Code).FirstOrDefault(c => c is not null));
     }
 
     /// <summary>Connects and asks for the OBS version; throws when OBS cannot be reached or rejects the password.</summary>
@@ -57,7 +59,16 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
             case "start_replay_buffer": await obs.RequestAsync("StartReplayBuffer", alreadyDone: true); break;
             case "stop_replay_buffer": await obs.RequestAsync("StopReplayBuffer", alreadyDone: true); break;
             case "save_replay":
-                await obs.RequestAsync("SaveReplayBuffer");
+                try
+                {
+                    await obs.RequestAsync("SaveReplayBuffer");
+                }
+                catch (ObsException off) when (off.Code == ReplayBufferOff)
+                {
+                    // The replay buffer was not running (e.g. no match_started in multiplayer): start it for the next kills.
+                    await obs.RequestAsync("StartReplayBuffer", alreadyDone: true);
+                    throw new ObsException("The replay buffer was off in OBS. MatchPulse started it now: this clip is missing, the next ones are saved.", ReplayBufferOff);
+                }
                 if (rule.Param is not "") RenameReplay(await obs.WaitForReplayAsync(), ObsTemplate.Fill(rule.Param, e));
                 break;
             case "switch_scene": await obs.RequestAsync("SetCurrentProgramScene", new JsonObject { ["sceneName"] = rule.Param }); break;
@@ -136,7 +147,11 @@ public static class ObsTemplate
     static string Kills(GameEvent e) => e.Data.GetValueOrDefault("kills", "0");
 }
 
-public sealed class ObsException(string message) : Exception(message);
+/// <param name="Code">OBS's request status code when OBS answered (the connection worked), else null.</param>
+public sealed class ObsException(string message, int? code = null) : Exception(message)
+{
+    public int? Code => code;
+}
 
 /// <summary>A minimal OBS WebSocket v5 session: Hello, Identify (with the password if OBS asks), then requests in order.</summary>
 public sealed class ObsSession : IAsyncDisposable
@@ -191,7 +206,7 @@ public sealed class ObsSession : IAsyncDisposable
             var code = (int?)status["code"] ?? 0;
             if ((bool?)status["result"] == true || alreadyDone && code is OutputRunning or OutputNotRunning or OutputPaused or OutputNotPaused)
                 return message["d"]!["responseData"];
-            throw new ObsException($"OBS {type} failed: {(string?)status["comment"] ?? "code " + code}.");
+            throw new ObsException($"OBS {type} failed: {(string?)status["comment"] ?? "code " + code}.", code);
         }
     }
 

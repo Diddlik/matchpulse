@@ -74,6 +74,18 @@ public sealed class UiHubTests : IDisposable
     }
 
     [Fact]
+    public void Plugin_reached_but_a_rule_failed_is_not_a_connection_failure()
+    {
+        _hub.Delivered(new ObsSink(new ObsSettings()), new ObsException("The replay buffer was off.", 501));
+        var obs = _hub.Snapshot()["plugins"]!.AsArray().First(p => (string?)p!["id"] == "obs")!;
+        Assert.Equal(("ruleFailed", "The replay buffer was off."), ((string?)obs["status"], (string?)obs["lastError"]));
+
+        _hub.Delivered(new ObsSink(new ObsSettings()), new System.Net.WebSockets.WebSocketException("refused"));
+        obs = _hub.Snapshot()["plugins"]!.AsArray().First(p => (string?)p!["id"] == "obs")!;
+        Assert.Equal(("error", "OBS is not reachable."), ((string?)obs["status"], (string?)obs["lastError"]));
+    }
+
+    [Fact]
     public void Saved_sinks_become_the_webhooks_and_scripts_of_the_config()
     {
         _hub.Receive("""{"type":"saveSinks","payload":[{"id":"x","kind":"script","target":" obs.cmd "},{"id":"y","kind":"webhook","target":"https://example.net/hook"}]}""");
