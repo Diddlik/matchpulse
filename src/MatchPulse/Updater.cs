@@ -56,15 +56,30 @@ public sealed class Updater(HttpClient http, Version current, string baseUrl = U
     }
 
     /// <summary>True when this copy was installed by the installer (not a portable copy), so it can update itself.</summary>
-    public static bool IsInstalled()
+    public static bool IsInstalled() => InstalledFor() is not null;
+
+    /// <summary>"user" or "all" for the installation this copy runs from, null for a portable copy.</summary>
+    static string? InstalledFor()
     {
-        using var key = Registry.CurrentUser.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{AppId}")
-            ?? Registry.LocalMachine.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{AppId}");
-        return key?.GetValue("InstallLocation") is string location
-            && Path.GetFullPath(location).TrimEnd('\\').Equals(Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        foreach (var (root, scope) in new[] { (Registry.CurrentUser, "user"), (Registry.LocalMachine, "all") })
+        {
+            using var key = root.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{AppId}");
+            if (key?.GetValue("InstallLocation") is string location
+                && Path.GetFullPath(location).TrimEnd('\\').Equals(Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                return scope;
+        }
+        return null;
     }
 
-    /// <summary>Starts the installer silently; it closes MatchPulse, installs over it and starts it again in the tray.</summary>
-    public static void StartInstaller(string installer) =>
-        Process.Start(new ProcessStartInfo(installer, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /relaunch=1") { UseShellExecute = false });
+    /// <summary>Starts the installer silently; it closes MatchPulse, installs over it and starts it again in the tray.
+    /// An installation for all users (Program Files) is updated for all users again, which asks once for admin rights (UAC).</summary>
+    public static void StartInstaller(string installer)
+    {
+        var allUsers = InstalledFor() == "all";
+        Process.Start(new ProcessStartInfo(installer, $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /relaunch=1 {(allUsers ? "/ALLUSERS" : "/CURRENTUSER")}")
+        {
+            UseShellExecute = allUsers, // lets Windows show the UAC prompt
+            Verb = allUsers ? "runas" : "",
+        });
+    }
 }

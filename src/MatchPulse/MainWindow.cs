@@ -65,6 +65,8 @@ sealed class MainWindow : Form
         }
 
         var core = _view.CoreWebView2;
+        // The cache is shared by every MatchPulse version: never show the page of an older one after an update.
+        await core.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache);
         core.Settings.AreDevToolsEnabled = System.Diagnostics.Debugger.IsAttached;
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
