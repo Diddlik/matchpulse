@@ -84,5 +84,9 @@ public sealed class EventDispatcher
                 Delivered?.Invoke(sink, e);
             }
         }
+        // The sink was replaced or the dispatcher completed: let it close what it holds open (an MQTT connection).
+        if (sink is IAsyncDisposable disposable)
+            try { await disposable.DisposeAsync(); }
+            catch (Exception e) { _log.LogWarning(e, "Event Sink {Sink} did not close cleanly", sink); }
     }
 }

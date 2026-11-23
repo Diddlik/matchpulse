@@ -5,7 +5,7 @@
 <h1 align="center">MatchPulse</h1>
 
 <p align="center">
-  <b>Turns your Battlefield 6 matches into events — kills, knockdowns, deaths, match start and end — and hands them to OBS, webhooks and scripts.</b>
+  <b>Turns your Battlefield 6 matches into events — kills, knockdowns, deaths, match start and end — and hands them to OBS, MQTT, webhooks and scripts.</b>
 </p>
 
 <p align="center">
@@ -25,6 +25,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 - **Knockdowns** and **your death** in REDSEC
 - **Matches** in REDSEC: start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
+- **MQTT** for Home Assistant, Node-RED and other smart-home or automation tools
 - **Webhooks and scripts** for anything else
 - **Live monitor**: a picture of every kill, also in a window of its own for a second screen
 - **Auto-update**, German and English, light and dark
@@ -101,6 +102,17 @@ if ($e.type -eq 'kill') { "$($e.occurredAt)  kill #$($e.data.kills)" | Add-Conte
 
 A failing, slow or hanging target never holds up detection or the other targets; its error shows on the Targets page.
 
+## MQTT plugin
+
+Under **Plugins → MQTT**, enter your broker (address, port, optional TLS, user name and password) and a topic prefix. MatchPulse then publishes:
+
+| Topic | Payload |
+|---|---|
+| `matchpulse/events/<type>` | every event as JSON, e.g. `matchpulse/events/kill` — subscribe to `matchpulse/events/+` for all |
+| `matchpulse/status` | `online` or `offline`, retained; the broker sets `offline` by Last Will if MatchPulse stops unexpectedly |
+
+QoS 0, 1 or 2 can be chosen. In Home Assistant, for example, an automation with an MQTT trigger on `matchpulse/events/kill` can flash a light on every kill, and `matchpulse/status` serves as availability topic.
+
 ## OBS plugin
 
 MatchPulse controls OBS directly over **OBS WebSocket** (built into OBS 28 and later). In OBS, turn on *Tools → WebSocket Server Settings*, then enter address, port and password under **Plugins** in MatchPulse and add rules *"when event → action"*:
@@ -125,6 +137,7 @@ Every rule can wait a few seconds first — for example, save the replay buffer 
 
 ## Limits
 
+- MQTT: no Home Assistant auto-discovery yet; topics are set up by hand.
 - REDSEC: matches, kills, knockdowns, deaths. Regular multiplayer: kills only so far (round start and end, knockdowns, deaths and double kills follow).
 - 16:9 screens; ultrawide (21:9) is planned.
 - Death detection needs the German game language until an English *Spectating* image is added.

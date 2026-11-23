@@ -25,7 +25,8 @@ public sealed record Config(
     bool LiveMonitor = false,
     ObsSettings? Obs = null,
     bool CheckForUpdates = true,
-    bool AutoInstallUpdates = true)
+    bool AutoInstallUpdates = true,
+    MqttSettings? Mqtt = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -38,6 +39,8 @@ public sealed record Config(
     public IReadOnlyList<string> Scripts { get; init; } = Scripts ?? [];
 
     public ObsSettings Obs { get; init; } = Obs ?? new ObsSettings();
+
+    public MqttSettings Mqtt { get; init; } = Mqtt ?? new MqttSettings();
 
     public static Config LoadOrDefault(string path) => File.Exists(path) ? Load(path) : new Config([]);
 
@@ -74,6 +77,10 @@ public sealed record Config(
             throw new InvalidDataException($"{path}: an OBS rule has an unknown event or action.");
         if (Obs.Rules.Any(r => r.DelaySeconds is < 0 or > 60 || r.DurationSeconds is < 0 or > 60))
             throw new InvalidDataException($"{path}: OBS rule delays and durations must be between 0 and 60 seconds.");
+        if (Mqtt.Port is < 1 or > 65535) throw new InvalidDataException($"{path}: MQTT port must be between 1 and 65535.");
+        if (Mqtt.Qos is < 0 or > 2) throw new InvalidDataException($"{path}: MQTT QoS must be 0, 1 or 2.");
+        if (string.IsNullOrWhiteSpace(Mqtt.TopicPrefix) || Mqtt.TopicPrefix.IndexOfAny(['#', '+']) >= 0 || Mqtt.TopicPrefix.EndsWith('/'))
+            throw new InvalidDataException($"{path}: the MQTT topic prefix must not be empty, contain # or +, or end with /.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }
@@ -98,3 +105,8 @@ public sealed record ObsSettings(bool Enabled = false, string Host = "localhost"
 /// or replay file name (<c>save_replay</c>, empty keeps the OBS name). <see cref="Text"/>: the text of <c>set_text</c>.
 /// <see cref="DurationSeconds"/>: how long <c>show_source</c> shows the source (0 keeps it shown). Texts take <see cref="ObsTemplate"/> placeholders.</summary>
 public sealed record ObsRule(string Id, string Event, string Action, string Param = "", string Text = "", double DelaySeconds = 0, double DurationSeconds = 0);
+
+/// <summary>MQTT plugin: broker connection and topics. Events go to <c>&lt;TopicPrefix&gt;/events/&lt;type&gt;</c>, availability to
+/// <c>&lt;TopicPrefix&gt;/status</c>. The password is stored as typed.</summary>
+public sealed record MqttSettings(bool Enabled = false, string Host = "localhost", int Port = 1883, bool UseTls = false,
+    string Username = "", string Password = "", string TopicPrefix = "matchpulse", int Qos = 1);
