@@ -41,7 +41,9 @@
     log: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7M9 8h3', obs: 'M4 7h11v10H4zM15 10.5l5-3v9l-5-3',
     audio: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11',
     mqtt: 'M5 19a1 1 0 1 0 0-.01M5 13a6 6 0 0 1 6 6M5 7a12 12 0 0 1 12 12',
-    homeassistant: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5'
+    homeassistant: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5',
+    wled: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+    sound: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6'
   };
   const icon = (name, size) => `<svg width="${size || 18}" height="${size || 18}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const X_ICON = '<svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.4"/></svg>';
@@ -64,6 +66,7 @@
   // ---------- Abgeleitete Werte ----------
   const plugStatus = (p) => (!p.enabled ? 'off' : p.status);
   const psLabel = (id, s) => t(id !== 'obs' && s === 'connected' ? 'ps_connected_mqtt' : 'ps_' + s);
+  const soIsFile = (sound) => ['ding', 'double', 'low', 'fanfare'].indexOf(sound) < 0;
   const plugCls = (s) => (s === 'error' ? 'st-err' : s === 'disconnected' ? 'st-warn' : s === 'off' ? 'st-idle' : 'st-ok');
   const sinkStatus = (k) => (k.lastError ? 'err' : k.lastSuccessAt ? 'ok' : 'new');
   const sinkCls = (s) => (s === 'err' ? 'st-err' : s === 'ok' ? 'st-ok' : 'st-idle');
@@ -276,7 +279,7 @@
     const p = S.plugins.find((x) => x.id === S.plugSel) || S.plugins[0];
     if (!p) return `<h1>${esc(t('nav_plugins'))}</h1>`;
     const s = plugStatus(p);
-    const actions = p.id === 'obs' ? ['start_recording', 'stop_recording', 'pause_recording', 'resume_recording', 'split_recording', 'record_chapter', 'start_replay_buffer', 'stop_replay_buffer', 'save_replay', 'switch_scene', 'set_text', 'show_source', 'start_streaming', 'stop_streaming'] : ['duck', 'restore'];
+    const actions = p.id === 'wled' ? ['flash', 'preset', 'color', 'on', 'off'] : p.id === 'obs' ? ['start_recording', 'stop_recording', 'pause_recording', 'resume_recording', 'split_recording', 'record_chapter', 'start_replay_buffer', 'stop_replay_buffer', 'save_replay', 'switch_scene', 'set_text', 'show_source', 'start_streaming', 'stop_streaming'] : ['duck', 'restore'];
     const paramPh = { switch_scene: 'a_scene_ph', set_text: 'ph_source', show_source: 'ph_source', record_chapter: 'ph_chapter', save_replay: 'ph_replay_name' };
     return `
       <h1>${esc(t('nav_plugins'))}</h1>
@@ -307,6 +310,19 @@
               </div>
               ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
+            </div>` : p.id === 'wled' ? `
+            <div class="stack" style="gap:12px">
+              <h3>${esc(t('wl_conn'))}</h3>
+              <div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:1 1 260px"><span>${esc(t('wl_host'))}</span><input class="input mono" type="text" placeholder="192.168.1.50" value="${esc(p.config.host)}" data-change="wl" data-key="host"></label>
+                <button type="button" class="btn" data-act="testPlugin" data-arg="wled">${esc(t('obs_test'))}</button>
+              </div>
+              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('wl_err'))}</div>` : ''}
+              <span class="small muted">${esc(t('wl_hint'))}</span>
+            </div>` : p.id === 'sound' ? `
+            <div class="stack" style="gap:12px">
+              <span class="small muted">${esc(t('so_hint'))}</span>
+              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || '')}</div>` : ''}
             </div>` : p.id === 'homeassistant' ? `
             <div class="stack" style="gap:12px">
               ${!p.config.mqttEnabled ? `<div class="notice warn row-flex">${WARN_ICON}<span class="small" style="flex:1 1 260px">${esc(t('ha_needs_mqtt'))}</span><button type="button" class="btn s" data-act="plugSel" data-arg="mqtt">${esc(t('ha_to_mqtt'))}</button></div>` : ''}
@@ -369,7 +385,21 @@
                 <span class="small muted" style="width:40px">${esc(t('pl_when'))}</span>
                 <select class="select" aria-label="${esc(t('pl_event'))}" data-change="ruleEvent" data-id="${esc(r.id)}">${['match_started', 'kill', 'knockdown', 'death', 'match_ended'].map((e) => `<option value="${e}" ${r.event === e ? 'selected' : ''}>${esc(t('ev_' + e))}</option>`).join('')}</select>
                 <span class="small muted">→</span>
+                ${p.id === 'sound' ? `
+                <select class="select" aria-label="${esc(t('so_sound'))}" data-change="soSound" data-id="${esc(r.id)}">${['ding', 'double', 'low', 'fanfare', 'file'].map((x) => `<option value="${x}" ${(x === 'file' ? soIsFile(r.sound) : r.sound === x) ? 'selected' : ''}>${esc(t('so_' + x))}</option>`).join('')}</select>
+                ${soIsFile(r.sound) ? `<input class="input mono" type="text" style="flex:1 1 200px" placeholder="C:\\Sounds\\kill.wav" aria-label="${esc(t('so_file'))}" value="${esc(r.sound === 'file' ? '' : r.sound)}" data-change="soFile" data-id="${esc(r.id)}">` : ''}
+                <label class="row-flex small muted" style="gap:8px">${esc(t('au_vol'))}<input class="range" type="range" min="0" max="100" step="5" value="${r.volume}" data-change="soVolume" data-id="${esc(r.id)}" style="width:120px"><span class="num">${r.volume} %</span></label>
+                <span class="row-flex" style="gap:6px;flex-wrap:nowrap;margin-left:auto"><button type="button" class="icon-btn" aria-label="${esc(t('pl_try'))}" title="${esc(t('pl_try'))}" data-act="testRule" data-arg="${esc(r.id)}"><svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg></button>
+                  <button type="button" class="icon-btn" aria-label="${esc(t('pl_remove_rule'))}" data-act="removeRule" data-arg="${esc(r.id)}">${X_ICON}</button></span>
+              </div>` : ''}${p.id === 'sound' ? '' : `
                 <select class="select" aria-label="${esc(t('pl_action'))}" data-change="ruleAction" data-id="${esc(r.id)}">${actions.map((a) => `<option value="${a}" ${r.action === a ? 'selected' : ''}>${esc(t('a_' + a))}</option>`).join('')}</select>
+                ${p.id === 'wled' && (r.action === 'flash' || r.action === 'color') ? `<input type="color" aria-label="${esc(t('pick_color'))}" value="${esc((r.color || '#FF0000').toLowerCase())}" data-change="wlColor" data-id="${esc(r.id)}" style="width:48px;height:36px;padding:2px;border-radius:6px;border:1px solid var(--border);background:var(--surface2)">` : ''}
+                ${p.id === 'wled' && r.action === 'flash' ? `<select class="select" aria-label="${esc(t('wl_effect'))}" data-change="wlEffect" data-id="${esc(r.id)}">${['solid', 'blink', 'strobe'].map((x) => `<option value="${x}" ${r.effect === x ? 'selected' : ''}>${esc(t('wl_fx_' + x))}</option>`).join('')}</select>
+                  <label class="row-flex small muted" style="gap:6px">${esc(t('pl_for'))}<input class="input num" type="number" min="0.1" max="30" step="0.5" style="width:70px" value="${r.durationSeconds}" data-change="wlDuration" data-id="${esc(r.id)}">s</label>` : ''}
+                ${p.id === 'wled' && r.action === 'preset' ? `<label class="row-flex small muted" style="gap:6px">${esc(t('wl_preset'))}<input class="input num" type="number" min="1" max="250" style="width:70px" value="${r.preset}" data-change="wlPreset" data-id="${esc(r.id)}"></label>` : ''}
+                ${p.id === 'wled' ? `<span class="row-flex" style="gap:6px;flex-wrap:nowrap;margin-left:auto"><button type="button" class="icon-btn" aria-label="${esc(t('pl_try'))}" title="${esc(t('pl_try'))}" data-act="testRule" data-arg="${esc(r.id)}"><svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg></button>
+                  <button type="button" class="icon-btn" aria-label="${esc(t('pl_remove_rule'))}" data-act="removeRule" data-arg="${esc(r.id)}">${X_ICON}</button></span>
+              </div>` : ''}${p.id === 'wled' ? '' : `
                 ${paramPh[r.action] ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t(paramPh[r.action]))}" aria-label="${esc(t(paramPh[r.action]))}" value="${esc(r.param)}" data-change="ruleParam" data-id="${esc(r.id)}">` : ''}
                 ${r.action === 'set_text' ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t('ph_text'))}" aria-label="${esc(t('ph_text'))}" value="${esc(r.text || '')}" data-change="ruleText" data-id="${esc(r.id)}">` : ''}
                 ${r.action === 'show_source' ? `<label class="row-flex small muted" style="gap:6px">${esc(t('pl_for'))}<input class="input num" type="number" min="0" max="60" step="0.5" style="width:70px" value="${r.durationSeconds || 0}" data-change="ruleDuration" data-id="${esc(r.id)}">s</label>` : ''}
@@ -377,7 +407,7 @@
                   <label class="row-flex small muted" style="gap:6px;flex-wrap:nowrap">${esc(t('pl_after'))}<input class="input num" type="number" min="0" max="60" step="0.5" style="width:70px" value="${r.delaySeconds || 0}" data-change="ruleDelay" data-id="${esc(r.id)}">s</label>
                   <button type="button" class="icon-btn" aria-label="${esc(t('pl_remove_rule'))}" data-act="removeRule" data-arg="${esc(r.id)}">${X_ICON}</button>
                 </span>
-              </div>`).join('') || `<p class="small muted">${esc(t('pl_no_rules'))}</p>`}
+              </div>`}`}`).join('') || `<p class="small muted">${esc(t('pl_no_rules'))}</p>`}
             ${p.id === 'obs' ? `<span class="small muted">${esc(t('pl_placeholders'))}</span>` : ''}
             <span class="small muted">${esc(t('pl_apply'))}</span>
           </div>`}
@@ -572,7 +602,10 @@
     testPlugin: (id) => B.send('testPlugin', { id }),
     addApp: () => { const n = S.newApp.trim(); if (!n) return; editPlug((p) => { p.config.apps.push({ name: n, volume: 30 }); }); S.newApp = ''; },
     removeApp: (i) => editPlug((p) => { p.config.apps.splice(Number(i), 1); }),
-    addRule: () => editPlug((p) => { p.rules.push({ id: uid('r'), event: 'kill', action: p.id === 'obs' ? 'save_replay' : 'duck', param: '', text: '', delaySeconds: 0, durationSeconds: 0 }); }),
+    addRule: () => editPlug((p) => { p.rules.push(p.id === 'wled' ? { id: uid('r'), event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 }
+      : p.id === 'sound' ? { id: uid('r'), event: 'kill', sound: 'ding', volume: 80 }
+      : { id: uid('r'), event: 'kill', action: p.id === 'obs' ? 'save_replay' : 'duck', param: '', text: '', delaySeconds: 0, durationSeconds: 0 }); }),
+    testRule: (id) => B.send('testRule', { id: curPlug().id, ruleId: id }),
     removeRule: (id) => editPlug((p) => { p.rules = p.rules.filter((r) => r.id !== id); }),
     liveOn: () => { S.settings.liveMonitor = true; S.draft.liveMonitor = true; S.liveIdx = -1; B.send('setLiveMonitor', { enabled: true }); },
     liveStep: (d) => { const n = S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : true)).length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
@@ -612,6 +645,14 @@
     mq: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.dataset.key === 'password' ? v : v.trim(); }, 'mqtt'),
     mqNum: (v, el) => editPlug((p) => { p.config[el.dataset.key] = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'mqtt'),
     ha: (v, el) => editPlug((p) => { p.config[el.dataset.key] = v.trim(); }, 'homeassistant'),
+    wl: (v, el) => editPlug((p) => { p.config[el.dataset.key] = v.trim(); }, 'wled'),
+    wlColor: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).color = v.toUpperCase(); }, 'wled'),
+    wlEffect: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).effect = v; }, 'wled'),
+    wlDuration: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).durationSeconds = Math.min(30, Math.max(0.1, Number(v) || 1.5)); }, 'wled'),
+    wlPreset: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).preset = Math.min(250, Math.max(1, Math.round(Number(v) || 1))); }, 'wled'),
+    soSound: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).sound = v; }, 'sound'),
+    soFile: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).sound = v.trim().replace(/^"|"$/g, '') || 'file'; }, 'sound'),
+    soVolume: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).volume = Number(v); }, 'sound'),
     mqBool: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.checked; }, 'mqtt'),
     appVol: (v, el) => editPlug((p) => { p.config.apps[Number(el.dataset.idx)].volume = Number(v); }),
     restoreOnExit: (v, el) => editPlug((p) => { p.config.restoreOnExit = el.checked; }),
@@ -663,7 +704,7 @@
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },
-    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error') toast(t(id === 'obs' ? 'obs_ok' : id === 'homeassistant' ? 'ha_ok' : 'mq_ok')); },
+    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error' && id !== 'sound') toast(t(id === 'obs' ? 'obs_ok' : id === 'homeassistant' ? 'ha_ok' : id === 'wled' ? 'wl_ok' : 'mq_ok')); },
     settings: (s) => { const wasDirty = dirty(); S.settings = s; if (!wasDirty) { S.draft = clone(s); S.hexDraft = s.killMarkerColor; } },
     diagnostics: (list) => { S.diagnostics = list; },
     hostProblems: (list) => { S.hostProblems = list; },
