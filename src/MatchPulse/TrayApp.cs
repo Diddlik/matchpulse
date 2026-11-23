@@ -75,7 +75,7 @@ sealed class TrayApp : ApplicationContext
     /// <summary>The Event Dispatcher; its Event Sinks are replaced when settings are saved.</summary>
     public EventDispatcher Dispatcher { get; }
 
-    IEnumerable<IEventSink> Sinks() => [Status, _hub, .. Program.Sinks(Config, _http)];
+    IEnumerable<IEventSink> Sinks() => [Status, _hub, .. Program.Sinks(Config, _http, _hub.Delivered)];
 
     // Called by the UiHub on a worker thread; throws InvalidDataException for invalid settings.
     void Apply(Config config)

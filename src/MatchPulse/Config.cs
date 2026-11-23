@@ -70,6 +70,8 @@ public sealed record Config(
         if (Obs.Port is < 1 or > 65535) throw new InvalidDataException($"{path}: OBS port must be between 1 and 65535.");
         if (Obs.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || !ObsSettings.Actions.Contains(r.Action)))
             throw new InvalidDataException($"{path}: an OBS rule has an unknown event or action.");
+        if (Obs.Rules.Any(r => r.DelaySeconds is < 0 or > 60 || r.DurationSeconds is < 0 or > 60))
+            throw new InvalidDataException($"{path}: OBS rule delays and durations must be between 0 and 60 seconds.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }
@@ -80,10 +82,17 @@ public sealed record Config(
 public sealed record ObsSettings(bool Enabled = false, string Host = "localhost", int Port = 4455, string Password = "", IReadOnlyList<ObsRule>? Rules = null)
 {
     public static readonly string[] Events = ["match_started", "kill", "match_ended"];
-    public static readonly string[] Actions = ["start_recording", "stop_recording", "start_replay_buffer", "stop_replay_buffer", "save_replay", "switch_scene"];
+    public static readonly string[] Actions =
+    [
+        "start_recording", "stop_recording", "pause_recording", "resume_recording", "split_recording", "record_chapter",
+        "start_replay_buffer", "stop_replay_buffer", "save_replay", "switch_scene", "set_text", "show_source", "start_streaming", "stop_streaming",
+    ];
 
     public IReadOnlyList<ObsRule> Rules { get; init; } = Rules ?? [];
 }
 
-/// <summary>When <see cref="Event"/> happens, run <see cref="Action"/>; <see cref="Param"/> is the scene name for <c>switch_scene</c>.</summary>
-public sealed record ObsRule(string Id, string Event, string Action, string Param = "");
+/// <summary>When <see cref="Event"/> happens, run <see cref="Action"/> after <see cref="DelaySeconds"/>.
+/// <see cref="Param"/>: scene (<c>switch_scene</c>), source (<c>set_text</c>, <c>show_source</c>), chapter name (<c>record_chapter</c>)
+/// or replay file name (<c>save_replay</c>, empty keeps the OBS name). <see cref="Text"/>: the text of <c>set_text</c>.
+/// <see cref="DurationSeconds"/>: how long <c>show_source</c> shows the source (0 keeps it shown). Texts take <see cref="ObsTemplate"/> placeholders.</summary>
+public sealed record ObsRule(string Id, string Event, string Action, string Param = "", string Text = "", double DelaySeconds = 0, double DurationSeconds = 0);

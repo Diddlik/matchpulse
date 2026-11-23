@@ -70,11 +70,12 @@ static class Program
     }
 
     /// <summary>The Event Sinks the config file asks for.</summary>
-    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http) =>
+    /// <param name="later">Results of OBS rules that run after a delay.</param>
+    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http, Action<IEventSink, Exception?>? later = null) =>
         [
             .. config.Webhooks.Select(url => new WebhookSink(http, url)),
             .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
-            .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs)] : Array.Empty<IEventSink>(),
+            .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs, later)] : Array.Empty<IEventSink>(),
         ];
 
     [DllImport("kernel32.dll")]

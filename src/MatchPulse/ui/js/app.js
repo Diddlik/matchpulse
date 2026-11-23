@@ -257,7 +257,8 @@
     const p = S.plugins.find((x) => x.id === S.plugSel) || S.plugins[0];
     if (!p) return `<h1>${esc(t('nav_plugins'))}</h1>`;
     const s = plugStatus(p);
-    const actions = p.id === 'obs' ? ['start_recording', 'stop_recording', 'start_replay_buffer', 'stop_replay_buffer', 'save_replay', 'switch_scene'] : ['duck', 'restore'];
+    const actions = p.id === 'obs' ? ['start_recording', 'stop_recording', 'pause_recording', 'resume_recording', 'split_recording', 'record_chapter', 'start_replay_buffer', 'stop_replay_buffer', 'save_replay', 'switch_scene', 'set_text', 'show_source', 'start_streaming', 'stop_streaming'] : ['duck', 'restore'];
+    const paramPh = { switch_scene: 'a_scene_ph', set_text: 'ph_source', show_source: 'ph_source', record_chapter: 'ph_chapter', save_replay: 'ph_replay_name' };
     return `
       <h1>${esc(t('nav_plugins'))}</h1>
       <p class="muted" style="max-width:75ch">${esc(t('pl_intro'))}</p>
@@ -312,10 +313,15 @@
                 <select class="select" aria-label="${esc(t('pl_event'))}" data-change="ruleEvent" data-id="${esc(r.id)}">${['match_started', 'kill', 'match_ended'].map((e) => `<option value="${e}" ${r.event === e ? 'selected' : ''}>${esc(t('ev_' + e))}</option>`).join('')}</select>
                 <span class="small muted">→</span>
                 <select class="select" aria-label="${esc(t('pl_action'))}" data-change="ruleAction" data-id="${esc(r.id)}">${actions.map((a) => `<option value="${a}" ${r.action === a ? 'selected' : ''}>${esc(t('a_' + a))}</option>`).join('')}</select>
-                ${r.action === 'switch_scene' ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t('a_scene_ph'))}" aria-label="${esc(t('a_scene_ph'))}" value="${esc(r.param)}" data-change="ruleParam" data-id="${esc(r.id)}">` : ''}
-                <span class="grow"></span>
-                <button type="button" class="icon-btn" aria-label="${esc(t('pl_remove_rule'))}" data-act="removeRule" data-arg="${esc(r.id)}">${X_ICON}</button>
+                ${paramPh[r.action] ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t(paramPh[r.action]))}" aria-label="${esc(t(paramPh[r.action]))}" value="${esc(r.param)}" data-change="ruleParam" data-id="${esc(r.id)}">` : ''}
+                ${r.action === 'set_text' ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t('ph_text'))}" aria-label="${esc(t('ph_text'))}" value="${esc(r.text || '')}" data-change="ruleText" data-id="${esc(r.id)}">` : ''}
+                ${r.action === 'show_source' ? `<label class="row-flex small muted" style="gap:6px">${esc(t('pl_for'))}<input class="input num" type="number" min="0" max="60" step="0.5" style="width:70px" value="${r.durationSeconds || 0}" data-change="ruleDuration" data-id="${esc(r.id)}">s</label>` : ''}
+                <span class="row-flex" style="gap:6px;flex-wrap:nowrap;margin-left:auto">
+                  <label class="row-flex small muted" style="gap:6px;flex-wrap:nowrap">${esc(t('pl_after'))}<input class="input num" type="number" min="0" max="60" step="0.5" style="width:70px" value="${r.delaySeconds || 0}" data-change="ruleDelay" data-id="${esc(r.id)}">s</label>
+                  <button type="button" class="icon-btn" aria-label="${esc(t('pl_remove_rule'))}" data-act="removeRule" data-arg="${esc(r.id)}">${X_ICON}</button>
+                </span>
               </div>`).join('') || `<p class="small muted">${esc(t('pl_no_rules'))}</p>`}
+            ${p.id === 'obs' ? `<span class="small muted">${esc(t('pl_placeholders'))}</span>` : ''}
             <span class="small muted">${esc(t('pl_apply'))}</span>
           </div>
         </section>
@@ -499,7 +505,7 @@
     testPlugin: (id) => B.send('testPlugin', { id }),
     addApp: () => { const n = S.newApp.trim(); if (!n) return; editPlug((p) => { p.config.apps.push({ name: n, volume: 30 }); }); S.newApp = ''; },
     removeApp: (i) => editPlug((p) => { p.config.apps.splice(Number(i), 1); }),
-    addRule: () => editPlug((p) => { p.rules.push({ id: uid('r'), event: 'kill', action: p.id === 'obs' ? 'save_replay' : 'duck', param: '' }); }),
+    addRule: () => editPlug((p) => { p.rules.push({ id: uid('r'), event: 'kill', action: p.id === 'obs' ? 'save_replay' : 'duck', param: '', text: '', delaySeconds: 0, durationSeconds: 0 }); }),
     removeRule: (id) => editPlug((p) => { p.rules = p.rules.filter((r) => r.id !== id); }),
     liveOn: () => { S.settings.liveMonitor = true; S.draft.liveMonitor = true; S.liveIdx = -1; B.send('setLiveMonitor', { enabled: true }); },
     liveStep: (d) => { const n = S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : true)).length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
@@ -537,7 +543,10 @@
     restoreOnExit: (v, el) => editPlug((p) => { p.config.restoreOnExit = el.checked; }),
     ruleEvent: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).event = v; }),
     ruleAction: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).action = v; }),
-    ruleParam: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).param = v; })
+    ruleParam: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).param = v; }),
+    ruleText: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).text = v; }),
+    ruleDelay: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).delaySeconds = Math.min(60, Math.max(0, Number(v) || 0)); }),
+    ruleDuration: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).durationSeconds = Math.min(60, Math.max(0, Number(v) || 0)); })
   };
   const INP = {
     editDraft: (v) => { S.editDraft = v; },
