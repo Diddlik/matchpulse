@@ -13,6 +13,10 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// <summary>Kill Badge in the Score Popup. The Knockdown Badge scores at most ~0.75 against it.</summary>
     public static readonly Cue KillBadge = new("kill_badge", "kill_badge.png", new Rect2d(0.30, 0.62, 0.20, 0.06), 0.8, 2);
 
+    /// <summary>Kill Badge outside REDSEC (multiplayer): a skull without the tick, scoring 0.96-0.99 on own kills.
+    /// It also matches the REDSEC Knockdown Badge, so it is used only while no Match runs.</summary>
+    public static readonly Cue KillBadgePlain = new("kill_badge_plain", "kill_badge_plain.png", new Rect2d(0.30, 0.62, 0.20, 0.06), 0.8, 2);
+
     /// <summary>X around the crosshair (red by default, colour set in the game), matched as a colour mask at 4 scales.
     /// Shown on knockdowns too, so it only gates the Kill Badge. Kill Markers score 0.43-0.71 on the fixtures, other frames at most 0.30.</summary>
     public static readonly Cue KillMarker = new("kill_marker", "kill_marker_mask.png", new Rect2d(0.4531, 0.4167, 0.0938, 0.1667), 0.37, 1);

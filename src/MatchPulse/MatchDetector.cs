@@ -7,7 +7,8 @@ namespace MatchPulse;
 /// <summary>
 /// Takes timestamped frames and emits Game Events. No I/O; time comes from the frames only.
 /// A Match starts when the in-match HUD is confirmed and ends on an end-of-match screen, or when the
-/// in-match HUD has been absent for <c>hudLostAfter</c>. Kills are reported only inside a Match.
+/// in-match HUD has been absent for <c>hudLostAfter</c>. Kills are reported everywhere; outside a Match
+/// (multiplayer) they carry no matchId and are found by the plain Kill Badge.
 /// </summary>
 public sealed class MatchDetector
 {
@@ -15,7 +16,7 @@ public sealed class MatchDetector
     readonly string _gameLanguage;
     readonly bool _useKillCounterFlash;
     Size _frameSize;
-    Mat _killBadge = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
+    Mat _killBadge = null!, _killBadgePlain = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
     Mat? _killCounter;
     Mat[] _killMarker = [];
     readonly TimeSpan _hudLostAfter;
@@ -84,10 +85,18 @@ public sealed class MatchDetector
                 StartMatch();
                 _hudSeenAt = frame.Timestamp;
                 events.Add(Emit("match_started", startedAt));
+                return events;
             }
-            return events;
         }
+        else if (EndOfMatch(frame, hud) is { } ended)
+            return ended;
 
+        Kills(frame, events);
+        return events;
+    }
+
+    List<GameEvent>? EndOfMatch(Frame frame, bool hud)
+    {
         if (hud) _hudSeenAt = frame.Timestamp;
         var victory = _victory.Update(MaskScore(frame.Image, Cue.EndVictory, VictoryGold, _endVictory) >= Cue.EndVictory.Threshold, frame.Timestamp);
         var defeat = _defeat.Update(MaskScore(frame.Image, Cue.EndDefeat, DefeatRed, _endDefeat) >= Cue.EndDefeat.Threshold, frame.Timestamp);
@@ -102,7 +111,11 @@ public sealed class MatchDetector
             _log.LogInformation("Cue {Cue} absent since {At:O}", Cue.InMatchHud.Name, _hudSeenAt);
             return EndMatch(frame.Timestamp, "unknown", "hud_lost");
         }
+        return null;
+    }
 
+    void Kills(Frame frame, List<GameEvent> events)
+    {
         var killMarker = _killMarkerBands is not null && MaskScore(frame.Image, Cue.KillMarker, _killMarkerBands, _killMarker) >= Cue.KillMarker.Threshold;
         if (killMarker && !_killMarkerVisible)
         {
@@ -121,7 +134,7 @@ public sealed class MatchDetector
             {
                 var confirmed = _rise.Min(r => r.Count);
                 var at = _rise[0].At;
-                _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KillBadge.Name, confirmed, at);
+                _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", (_matchId is null ? Cue.KillBadgePlain : Cue.KillBadge).Name, confirmed, at);
                 var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
                 if (marker >= 0 || _killMarkerBands is null)
                 {
@@ -160,8 +173,6 @@ public sealed class MatchDetector
 
         if (_pendingFlash is { } flash && frame.Timestamp > flash.KillMarker + KillMarkerWindow)
             events.Add(EmitPendingFlash(flash));
-
-        return events;
     }
 
     /// <summary>The game closed at <paramref name="at"/>: ends a running Match with <c>result: unknown</c>, <c>reason: game_exited</c>.</summary>
@@ -175,9 +186,15 @@ public sealed class MatchDetector
     void StartMatch()
     {
         _matchId = Guid.NewGuid().ToString("N");
-        _sequence = 0;
         _victory.Reset();
         _defeat.Reset();
+        ResetKills();
+    }
+
+    // Per Match, and back to multiplayer kills (other Kill Badge template) after it.
+    void ResetKills()
+    {
+        _sequence = 0;
         _killBadges = 0;
         _rise.Clear();
         _fall.Clear();
@@ -195,6 +212,7 @@ public sealed class MatchDetector
         events.Add(Emit("match_ended", at, new() { ["result"] = result, ["reason"] = reason }));
         _matchId = null;
         _hud.Reset();
+        ResetKills();
         return events;
     }
 
@@ -210,6 +228,7 @@ public sealed class MatchDetector
     {
         _frameSize = frame;
         _killBadge = Cue.KillBadge.LoadTemplate(frame, _gameLanguage);
+        _killBadgePlain = Cue.KillBadgePlain.LoadTemplate(frame, _gameLanguage);
         using var killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
         foreach (var scaled in _killMarker) scaled.Dispose();
         _killMarker = KillMarkerScales.Select(s => killMarker.Resize(new Size(Math.Round(killMarker.Width * s), Math.Round(killMarker.Height * s)), 0, 0, InterpolationFlags.Area)).ToArray();
@@ -220,7 +239,7 @@ public sealed class MatchDetector
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>
-        new(type, _matchId!, ++_sequence, at, data ?? []);
+        new(type, _matchId, ++_sequence, at, data ?? []);
 
     static double GrayScore(Mat image, Cue cue, Mat template)
     {
@@ -289,7 +308,8 @@ public sealed class MatchDetector
     {
         using var region = Cue.KillBadge.Crop(image);
         using var gray = region.CvtColor(ColorConversionCodes.BGR2GRAY);
-        using var scores = gray.MatchTemplate(_killBadge, TemplateMatchModes.CCoeffNormed);
+        var badge = _matchId is null ? _killBadgePlain : _killBadge;
+        using var scores = gray.MatchTemplate(badge, TemplateMatchModes.CCoeffNormed);
 
         // Count every match above the threshold, blanking each one's neighbourhood so it is counted once.
         var count = 0;
@@ -298,7 +318,7 @@ public sealed class MatchDetector
             scores.MinMaxLoc(out _, out double max, out _, out Point at);
             if (max < Cue.KillBadge.Threshold) return count;
             count++;
-            scores.Rectangle(new Rect(at.X - _killBadge.Width, at.Y - _killBadge.Height, 2 * _killBadge.Width, 2 * _killBadge.Height), Scalar.All(-1), -1);
+            scores.Rectangle(new Rect(at.X - badge.Width, at.Y - badge.Height, 2 * badge.Width, 2 * badge.Height), Scalar.All(-1), -1);
         }
     }
 
