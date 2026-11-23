@@ -105,6 +105,67 @@ public sealed class MqttSinkTests : IAsyncLifetime
         Assert.Equal(new MqttSettings(true, "broker.lan", 8883, true, "u", "p", "home/bf6", 2), UiHub.MqttFrom(plugin));
     }
 
+    [Fact]
+    public async Task State_topics_follow_the_Match_and_are_retained()
+    {
+        await using var sink = new MqttSink(Settings());
+        var empty = new Dictionary<string, string>();
+
+        await sink.SendAsync(new GameEvent("match_started", "m1", 1, Start, empty), default);
+        await sink.SendAsync(new GameEvent("kill", "m1", 2, Start, new Dictionary<string, string> { ["kills"] = "1" }), default);
+        await sink.SendAsync(new GameEvent("knockdown", "m1", 3, Start, empty), default);
+        await sink.SendAsync(new GameEvent("death", "m1", 4, Start, empty), default);
+
+        await Until(() => _published.Count(p => p.Topic == "bf6/matchpulse/state/last_event") == 4);
+        string Last(string state) { lock (_published) return _published.Last(p => p.Topic == $"bf6/matchpulse/state/{state}").Payload; }
+        Assert.Equal(("ON", "1", "1", "1", "death"), (Last("match"), Last("kills"), Last("knockdowns"), Last("deaths"), Last("last_event")));
+        Assert.All(_published.Where(p => p.Topic.Contains("/state/")), p => Assert.True(p.Retain));
+    }
+
+    [Fact]
+    public async Task Home_Assistant_discovery_announces_the_device_at_start_without_waiting_for_an_event()
+    {
+        var results = new List<Exception?>();
+        await using var sink = new MqttSink(Settings(), new HomeAssistantSettings(true, "ha"), (_, e) => results.Add(e));
+
+        await Until(() => results.Count == 1);
+        Assert.Null(results[0]);
+        (string Topic, string Payload, bool Retain)[] configs;
+        lock (_published) configs = [.. _published.Where(p => p.Topic.StartsWith("ha/"))];
+
+        Assert.Equal(10, configs.Length); // 1 binary sensor, 4 sensors, 5 device triggers
+        Assert.All(configs, c => Assert.True(c.Retain));
+        var match = JsonNode.Parse(configs.Single(c => c.Topic == "ha/binary_sensor/bf6_matchpulse/match/config").Payload)!;
+        Assert.Equal(("bf6/matchpulse/state/match", "bf6/matchpulse/status", "MatchPulse"),
+            ((string?)match["state_topic"], (string?)match["availability_topic"], (string?)match["device"]!["name"]));
+        var kill = JsonNode.Parse(configs.Single(c => c.Topic == "ha/device_automation/bf6_matchpulse/kill/config").Payload)!;
+        Assert.Equal(("trigger", "bf6/matchpulse/events/kill"), ((string?)kill["automation_type"], (string?)kill["topic"]));
+    }
+
+    [Fact]
+    public async Task Home_Assistant_turned_off_removes_the_device()
+    {
+        await using var sink = new MqttSink(Settings(), new HomeAssistantSettings(false, "ha"));
+
+        await sink.SendAsync(new GameEvent("kill", null, 1, Start, new Dictionary<string, string> { ["kills"] = "1" }), default);
+
+        lock (_published)
+        {
+            var configs = _published.Where(p => p.Topic.StartsWith("ha/")).ToList();
+            Assert.Equal(10, configs.Count);
+            Assert.All(configs, c => Assert.Equal(("", true), (c.Payload ?? "", c.Retain))); // an empty retained message deletes the config
+        }
+    }
+
+    [Fact]
+    public void Home_Assistant_plugin_from_the_window_maps_to_its_settings()
+    {
+        var plugin = JsonNode.Parse("""{"id":"homeassistant","enabled":true,"config":{"discoveryPrefix":" homeassistant ","topicPrefix":"matchpulse","mqttEnabled":true},"rules":[]}""")!.AsObject();
+
+        Assert.Equal(new HomeAssistantSettings(true, "homeassistant"), UiHub.HomeAssistantFrom(plugin));
+        Assert.Equal("bf6_matchpulse", HomeAssistant.NodeId("BF6/MatchPulse"));
+    }
+
     static int FreePort()
     {
         using var probe = new TcpListener(IPAddress.Loopback, 0);
