@@ -23,7 +23,9 @@ public sealed record Config(
     string Theme = "system",
     bool NotifyOnProblems = true,
     bool LiveMonitor = false,
-    ObsSettings? Obs = null)
+    ObsSettings? Obs = null,
+    bool CheckForUpdates = true,
+    bool AutoInstallUpdates = true)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");

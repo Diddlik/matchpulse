@@ -52,7 +52,7 @@
   const S = {
     loaded: false, page: 'status',
     appState: 'off', match: null, hostProblems: [], events: [], sinks: [], plugins: [], settings: null, draft: null,
-    diagnostics: [], highlights: [], log: [], pending: [],
+    diagnostics: [], highlights: [], log: [], pending: [], update: null,
     selEvent: null, evFilter: 'all', copied: false,
     editId: null, editDraft: '', editError: '', addKind: 'webhook', addTarget: '', addError: '',
     hexDraft: '', justSaved: false, diagIdx: 0, confirmClear: false,
@@ -100,15 +100,30 @@
       <g transform="translate(1220 60)"><rect width="330" height="34" rx="4" fill="rgba(0,0,0,.5)"/><rect x="14" y="13" width="110" height="8" rx="4" fill="#7fc4ff"/><rect x="138" y="13" width="26" height="8" rx="3" fill="#8a919b"/><rect x="178" y="13" width="130" height="8" rx="4" fill="#d8dce2"/></g>
     </svg>`;
 
+  const updateLine = () => {
+    const u = S.update; if (!u) return '';
+    const head = t('up_installed', { v: u.current });
+    const tail = { checking: t('up_checking'), upToDate: t('up_uptodate'), available: t('up_available', { v: u.latest }), waitingForGame: t('up_waiting'),
+      downloading: t('up_downloading'), installing: t('up_installing'), error: u.error || t('up_error') }[u.status];
+    return head + (tail ? ' · ' + tail : '') + (u.checkedAt && u.status !== 'checking' ? ' · ' + t('up_checked', { t: time(u.checkedAt) }) : '');
+  };
+
   // ---------- Seiten ----------
   function pageStatus() {
     const st = S.appState, isMatch = st === 'match' && S.match;
     const kills = isMatch ? roundKills().length : 0;
     const latest = S.events.slice().sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5);
     const probs = problems();
+    const up = S.update;
+    const upNotice = up && (up.status === 'available' || up.status === 'waitingForGame') ? `
+      <section class="notice row-flex" style="padding:14px 18px">
+        <span style="flex:1 1 300px"><strong>${esc(t('up_available', { v: up.latest }))}</strong> <span class="muted small">${esc(up.status === 'waitingForGame' ? t('up_waiting') : up.installable ? '' : t('up_portable'))}</span></span>
+        ${up.installable ? (up.status === 'available' ? `<button type="button" class="btn s primary" data-act="installUpdate">${esc(t('up_install'))}</button>` : '') : `<button type="button" class="btn s" data-act="openReleasePage">${esc(t('up_release_page'))}</button>`}
+      </section>` : '';
     const okSinks = S.sinks.filter((k) => !k.lastError).length;
     return `
       <h1>${esc(t('nav_status'))}</h1>
+      ${upNotice}
       <section class="card s-${st}" style="flex-direction:row;flex-wrap:wrap;gap:24px;align-items:center;padding:24px">
         <div class="stack-s" style="flex:1 1 320px">
           <div class="row-flex"><span class="dot l ${st === 'off' ? '' : 'halo'}"></span><span style="font-size:24px;font-weight:600">${esc(t('st_' + st))}</span></div>
@@ -367,6 +382,15 @@
           <div class="setting"><div class="text"><label for="hd">${esc(t('hud'))}</label><span class="desc">${esc(t('hud_d'))}</span></div><div class="row-flex" style="gap:8px"><input id="hd" class="input num" type="number" min="10" step="10" value="${d.matchEndWithoutHudSeconds}" data-change="draftNum" data-key="matchEndWithoutHudSeconds" style="width:90px"><span class="muted">${esc(t('seconds'))}</span></div></div>
           <div class="setting"><div class="text"><label for="dg">${esc(t('diag_mode'))}</label><span class="desc">${esc(t('diag_mode_d'))}</span></div><input id="dg" class="check" type="checkbox" ${d.diagnosticMode ? 'checked' : ''} data-change="draftBool" data-key="diagnosticMode"></div>
         </section>
+        <section class="card flush settings-group"><h2>${esc(t('sec_updates'))}</h2>
+          <div class="setting"><div class="text"><span class="title">${esc(t('up_version'))}</span><span class="desc">${esc(updateLine())}</span></div>
+            <div class="row-flex" style="gap:8px">
+              ${S.update && S.update.status === 'available' ? (S.update.installable ? `<button type="button" class="btn s primary" data-act="installUpdate">${esc(t('up_install'))}</button>` : `<button type="button" class="btn s" data-act="openReleasePage">${esc(t('up_release_page'))}</button>`) : ''}
+              <button type="button" class="btn s" data-act="checkUpdates" ${S.update && ['checking', 'downloading', 'installing'].indexOf(S.update.status) >= 0 ? 'disabled' : ''}>${esc(t('up_check'))}</button>
+            </div></div>
+          <div class="setting"><div class="text"><label for="uc">${esc(t('up_auto_check'))}</label><span class="desc">${esc(t('up_auto_check_d'))}</span></div><input id="uc" class="check" type="checkbox" ${d.checkForUpdates ? 'checked' : ''} data-change="draftBool" data-key="checkForUpdates"></div>
+          <div class="setting"><div class="text"><label for="ua">${esc(t('up_auto_install'))}</label><span class="desc">${esc(t('up_auto_install_d'))}</span></div><input id="ua" class="check" type="checkbox" ${d.autoInstallUpdates ? 'checked' : ''} data-change="draftBool" data-key="autoInstallUpdates"></div>
+        </section>
         <div class="save-bar">
           <span class="small" style="flex:1 1 240px;color:${isDirty ? 'var(--warn)' : 'var(--muted)'}">${esc(isDirty ? t('unsaved') : S.justSaved ? t('saved') : t('all_saved'))}</span>
           <button type="button" class="btn" data-act="discard" ${isDirty ? '' : 'disabled'}>${esc(t('discard'))}</button>
@@ -456,6 +480,7 @@
     const st = S.appState;
     $('side-status').className = 'side-status s-' + st;
     $('side-status').innerHTML = `<div class="row-flex" style="gap:8px;font-weight:600"><span class="dot" style="width:10px;height:10px"></span>${esc(t('st_' + st))}</div>
+      ${S.update ? `<span class="caption muted" style="opacity:.7">MatchPulse ${esc(S.update.current)}</span>` : ''}
       <span class="caption muted">${esc(st === 'off' ? t('side_off') : st === 'game' || !S.match ? t('side_game', { r: S.settings.checksPerSecond }) : t('side_match', { t: hhmm(S.match.startedAt), k: roundKills().length }))}</span>`;
     $('toast').innerHTML = S.toast ? `<div class="toast">${OK_ICON}<span>${esc(S.toast)}</span></div>` : '';
     $('main-content').innerHTML = PAGES[S.page]();
@@ -524,6 +549,9 @@
     cancelClear: () => { S.confirmClear = false; },
     doClear: () => { S.confirmClear = false; S.diagIdx = 0; B.send('clearDiagnostics'); },
     logFilter: (f) => { S.logFilter = f; },
+    checkUpdates: () => B.send('checkUpdates'),
+    installUpdate: () => B.send('installUpdate'),
+    openReleasePage: () => B.send('openReleasePage'),
     refreshLog: () => { S.log = S.log.concat(S.pending); S.pending = []; }
   };
   const CHG = {
@@ -582,7 +610,7 @@
   const MSG = {
     snapshot: (p) => {
       Object.assign(S, { appState: p.appState, match: p.match, hostProblems: p.hostProblems || [], events: p.events || [], sinks: p.sinks || [], plugins: p.plugins || [],
-        settings: p.settings, draft: clone(p.settings), hexDraft: p.settings.killMarkerColor, diagnostics: p.diagnostics || [], highlights: p.highlights || [], log: p.log || [], loaded: true });
+        settings: p.settings, draft: clone(p.settings), hexDraft: p.settings.killMarkerColor, diagnostics: p.diagnostics || [], highlights: p.highlights || [], log: p.log || [], update: p.update || null, loaded: true });
       const lastKill = S.events.slice().reverse().find((e) => e.type === 'kill'); if (lastKill) S.selEvent = evKey(lastKill);
     },
     state: (p) => { S.appState = p.appState; S.match = p.match; },
@@ -594,6 +622,7 @@
     diagnostics: (list) => { S.diagnostics = list; },
     hostProblems: (list) => { S.hostProblems = list; },
     log: (lines) => { if (S.autoRefresh) S.log = S.log.concat(lines); else S.pending = S.pending.concat(lines); },
+    update: (u) => { S.update = u; },
     navigate: ({ page }) => { if (NAV.indexOf(page) >= 0) S.page = page; }
   };
   B.onMessage((m) => {

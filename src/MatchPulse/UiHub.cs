@@ -51,6 +51,18 @@ public sealed class UiHub : IEventSink
 
     public string DataFolder => _dataFolder;
 
+    /// <summary>Auto-update; set once by the tray app (null in tests and the terminal modes).</summary>
+    public UpdateService? Updates
+    {
+        get => _updates;
+        set
+        {
+            _updates = value;
+            if (value is not null) value.Changed += () => Send("update", value.State());
+        }
+    }
+    UpdateService? _updates;
+
     /// <summary>A message for the window: type and payload.</summary>
     public event Action<string, JsonNode?>? Post;
 
@@ -179,6 +191,11 @@ public sealed class UiHub : IEventSink
             case "testPlugin" when (string?)payload!["id"] == "obs": _ = TestObsAsync(_config().Obs); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
+            case "checkUpdates" when _updates is not null: _ = _updates.CheckAsync(); break;
+            case "installUpdate" when _updates is not null: _ = _updates.InstallAsync(); break;
+            case "openReleasePage" when (string?)_updates?.State()["releaseUrl"] is { } url:
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                break;
             // The audio plugin is not built yet; only OBS is listed.
         }
     }
@@ -199,6 +216,7 @@ public sealed class UiHub : IEventSink
                 ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
                 ["log"] = new JsonArray([.. _logLines.Select(l => l.DeepClone())]),
+                ["update"] = _updates?.State() ?? new JsonObject { ["current"] = Updater.AppVersion.ToString(), ["status"] = "idle", ["installable"] = false },
             };
     }
 
@@ -353,6 +371,8 @@ public sealed class UiHub : IEventSink
         ["diagnosticMode"] = config.Diagnostics,
         ["notifyOnProblems"] = config.NotifyOnProblems,
         ["liveMonitor"] = config.LiveMonitor,
+        ["checkForUpdates"] = config.CheckForUpdates,
+        ["autoInstallUpdates"] = config.AutoInstallUpdates,
     };
 
     public static Config SettingsFrom(Config config, JsonObject s) => config with
@@ -366,6 +386,8 @@ public sealed class UiHub : IEventSink
         Diagnostics = (bool?)s["diagnosticMode"] ?? config.Diagnostics,
         NotifyOnProblems = (bool?)s["notifyOnProblems"] ?? config.NotifyOnProblems,
         LiveMonitor = (bool?)s["liveMonitor"] ?? config.LiveMonitor,
+        CheckForUpdates = (bool?)s["checkForUpdates"] ?? config.CheckForUpdates,
+        AutoInstallUpdates = (bool?)s["autoInstallUpdates"] ?? config.AutoInstallUpdates,
     };
 
     /// <summary>The config with the window's list of Event Sinks. A malformed webhook URL makes the config invalid.</summary>

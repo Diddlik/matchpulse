@@ -67,6 +67,15 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\MatchPulse.exe"; Parameters: "--show"; Description: "{cm:Launch}"; Flags: nowait postinstall skipifsilent
+; Auto-update (MatchPulse runs the installer with /VERYSILENT /relaunch=1): start again in the tray.
+Filename: "{app}\MatchPulse.exe"; Flags: nowait; Check: Relaunch
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM MatchPulse.exe"; Flags: runhidden; RunOnceId: "StopMatchPulse"
+; Stop only the MatchPulse that runs from this installation, never another copy (e.g. a developer build).
+Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -Command ""Get-Process MatchPulse -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopMatchPulse"
+
+[Code]
+function Relaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
