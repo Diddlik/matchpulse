@@ -53,6 +53,10 @@ jobs:
           & $iscc /Q /DAppVersion=$env:VERSION /DSourceDir=..\publish installer\MatchPulse.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Compress-Archive publish\* artifacts\MatchPulse-$env:VERSION-portable-win-x64.zip
+          # Update manifest for MatchPulse's auto-update (read from releases/latest/download/latest.json).
+          $installer = "MatchPulse-Setup-$env:VERSION.exe"
+          $sha = (Get-FileHash "artifacts\$installer" -Algorithm SHA256).Hash.ToLowerInvariant()
+          @{ version = $env:VERSION; installer = $installer; sha256 = $sha } | ConvertTo-Json | Set-Content artifacts\latest.json -Encoding utf8NoBOM
 
       - name: Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4

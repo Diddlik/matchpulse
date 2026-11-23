@@ -22,6 +22,8 @@ sealed class TrayApp : ApplicationContext
     readonly string _configPath;
     readonly ILogger _log;
     readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    readonly HttpClient _download = new() { Timeout = TimeSpan.FromMinutes(10) };
+    System.Threading.Timer? _updateTimer;
     readonly NotifyIcon _tray = new() { Visible = true };
     static readonly Icon AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icons[TrayState.MatchRunning];
     readonly SynchronizationContext _ui;
@@ -65,6 +67,7 @@ sealed class TrayApp : ApplicationContext
             }, _hub.KillPicture))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
+        StartUpdates();
         if (showWindow) ShowWindow();
         if (showRequested is not null)
             ThreadPool.RegisterWaitForSingleObject(showRequested, (_, _) => _ui.Post(_ => ShowWindow(), null), null, Timeout.Infinite, executeOnlyOnce: false);
@@ -89,6 +92,42 @@ sealed class TrayApp : ApplicationContext
         _log.LogInformation("Settings applied: game language {Language}, Kill Marker colour {Color}, {Webhooks} webhook(s), {Scripts} script(s)",
             config.GameLanguage, config.KillMarkerColor, config.Webhooks.Count, config.Scripts.Count);
         _ui.Post(_ => RefreshTray(), null);
+    }
+
+    void StartUpdates()
+    {
+        // MATCHPULSE_UPDATE_URL points the updater at a test release site (see UpdateTests and the ticket 17 notes).
+        var updater = new Updater(_download, Updater.AppVersion, Environment.GetEnvironmentVariable("MATCHPULSE_UPDATE_URL") ?? Updater.DefaultBaseUrl);
+        var updates = new UpdateService(updater, () => Config, () => Status.State != TrayState.GameNotRunning, Updater.IsInstalled,
+            installer =>
+            {
+                Updater.StartInstaller(installer);
+                _ui.Post(_ => ExitThread(), null); // the installer replaces the files and starts MatchPulse again
+            },
+            Path.Combine(Path.GetTempPath(), "MatchPulse-update"), _log);
+        _hub.Updates = updates;
+        updates.Changed += () =>
+        {
+            if ((string?)updates.State()["status"] == "available" && !Config.AutoInstallUpdates)
+                _ui.Post(_ => Notify("UpdateAvailable", "setup"), null);
+        };
+        // First check shortly after start (if enabled), then once a minute for the daily check and a waiting install.
+        _updateTimer = new System.Threading.Timer(_ => _ = updates.Tick(), null, TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1));
+
+        // "Updated to version X" once after an update.
+        var marker = Path.Combine(_hub.DataFolder, "version.txt");
+        try
+        {
+            var before = File.Exists(marker) && Version.TryParse(File.ReadAllText(marker).Trim(), out var v) ? v : null;
+            if (before is not null && before < updater.Current)
+            {
+                _balloonPage = "status";
+                _tray.ShowBalloonTip(5000, "MatchPulse", string.Format(Ui.T(Config.UiLanguage, "Updated"), updater.Current), ToolTipIcon.Info);
+            }
+            if (before != updater.Current) File.WriteAllText(marker, updater.Current.ToString());
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     void ShowWindow(string? page = null)
@@ -138,6 +177,7 @@ sealed class TrayApp : ApplicationContext
 
     protected override void ExitThreadCore()
     {
+        _updateTimer?.Dispose();
         _window?.Close();
         _liveWindow?.Close();
         _tray.Visible = false;
@@ -146,6 +186,7 @@ sealed class TrayApp : ApplicationContext
         _watcher.Join(TimeSpan.FromSeconds(5));
         Dispatcher.CompleteAsync().Wait(TimeSpan.FromSeconds(5));
         _http.Dispose();
+        _download.Dispose();
         base.ExitThreadCore();
     }
 
