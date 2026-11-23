@@ -26,7 +26,8 @@ public sealed record Config(
     ObsSettings? Obs = null,
     bool CheckForUpdates = true,
     bool AutoInstallUpdates = true,
-    MqttSettings? Mqtt = null)
+    MqttSettings? Mqtt = null,
+    HomeAssistantSettings? HomeAssistant = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -41,6 +42,8 @@ public sealed record Config(
     public ObsSettings Obs { get; init; } = Obs ?? new ObsSettings();
 
     public MqttSettings Mqtt { get; init; } = Mqtt ?? new MqttSettings();
+
+    public HomeAssistantSettings HomeAssistant { get; init; } = HomeAssistant ?? new HomeAssistantSettings();
 
     public static Config LoadOrDefault(string path) => File.Exists(path) ? Load(path) : new Config([]);
 
@@ -81,6 +84,8 @@ public sealed record Config(
         if (Mqtt.Qos is < 0 or > 2) throw new InvalidDataException($"{path}: MQTT QoS must be 0, 1 or 2.");
         if (string.IsNullOrWhiteSpace(Mqtt.TopicPrefix) || Mqtt.TopicPrefix.IndexOfAny(['#', '+']) >= 0 || Mqtt.TopicPrefix.EndsWith('/'))
             throw new InvalidDataException($"{path}: the MQTT topic prefix must not be empty, contain # or +, or end with /.");
+        if (string.IsNullOrWhiteSpace(HomeAssistant.DiscoveryPrefix) || HomeAssistant.DiscoveryPrefix.IndexOfAny(['#', '+']) >= 0 || HomeAssistant.DiscoveryPrefix.EndsWith('/'))
+            throw new InvalidDataException($"{path}: the Home Assistant discovery prefix must not be empty, contain # or +, or end with /.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }

@@ -30,7 +30,7 @@ public sealed class UiHub : IEventSink
     readonly HashSet<string> _problems = [];
     bool _game;
     JsonObject? _match;
-    readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null) };
+    readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null), ["homeassistant"] = ("disconnected", null) };
 
     sealed record SinkHealth(DateTimeOffset? LastSuccessAt, DateTimeOffset? LastFailureAt, string? Code, string? Message);
 
@@ -121,7 +121,12 @@ public sealed class UiHub : IEventSink
     public void Delivered(IEventSink sink, Exception? error)
     {
         if (sink is ObsSink) { PluginResult("obs", error); return; }
-        if (sink is MqttSink) { PluginResult("mqtt", error); return; }
+        if (sink is MqttSink mqtt)
+        {
+            PluginResult("mqtt", error);
+            if (_config().HomeAssistant.Enabled) PluginResult("homeassistant", error);
+            return;
+        }
         if (SinkId(sink) is not { } id) return;
         bool newFailure;
         lock (_lock)
@@ -191,6 +196,8 @@ public sealed class UiHub : IEventSink
             case "testPlugin" when (string?)payload!["id"] == "obs": _ = TestObsAsync(_config().Obs); break;
             case "savePlugin" when (string?)payload!["id"] == "mqtt": Apply(_config() with { Mqtt = MqttFrom(payload!.AsObject()) }); break;
             case "testPlugin" when (string?)payload!["id"] == "mqtt": _ = TestMqttAsync(_config().Mqtt); break;
+            case "savePlugin" when (string?)payload!["id"] == "homeassistant": Apply(_config() with { HomeAssistant = HomeAssistantFrom(payload!.AsObject()) }); break;
+            case "testPlugin" when (string?)payload!["id"] == "homeassistant": _ = TestHomeAssistantAsync(_config()); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
             case "checkUpdates" when _updates is not null: _ = _updates.CheckAsync(); break;
@@ -213,7 +220,7 @@ public sealed class UiHub : IEventSink
                 ["hostProblems"] = Problems(),
                 ["events"] = new JsonArray([.. _events.Select(e => e.DeepClone())]),
                 ["sinks"] = Sinks(config),
-                ["plugins"] = new JsonArray(Obs(config.Obs), Mqtt(config.Mqtt)),
+                ["plugins"] = new JsonArray(Obs(config.Obs), Mqtt(config.Mqtt), HomeAssistantPlugin(config)),
                 ["settings"] = Settings(config),
                 ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
@@ -289,6 +296,44 @@ public sealed class UiHub : IEventSink
         }
     }
 
+    async Task TestHomeAssistantAsync(Config config)
+    {
+        try
+        {
+            if (!config.Mqtt.Enabled) throw new MqttRefusedException("Home Assistant needs the MQTT plugin: turn it on and enter the broker first.");
+            await MqttSink.TestAsync(config.Mqtt, CancellationToken.None, config.HomeAssistant with { Enabled = true });
+            Logged(DateTimeOffset.Now, LogLevel.Information, $"Home Assistant discovery published under {config.HomeAssistant.DiscoveryPrefix}/");
+            PluginResult("homeassistant", null);
+        }
+        catch (Exception e)
+        {
+            Logged(DateTimeOffset.Now, LogLevel.Warning, $"Home Assistant discovery failed: {e.Message}");
+            PluginResult("homeassistant", e);
+        }
+    }
+
+    JsonObject HomeAssistantPlugin(Config config)
+    {
+        lock (_lock)
+            return new JsonObject
+            {
+                ["id"] = "homeassistant",
+                ["enabled"] = config.HomeAssistant.Enabled,
+                ["status"] = !config.HomeAssistant.Enabled ? "disconnected" : !config.Mqtt.Enabled ? "error" : _plugins["homeassistant"].Status,
+                ["lastError"] = config.HomeAssistant.Enabled && !config.Mqtt.Enabled ? "Home Assistant needs the MQTT plugin: turn it on and enter the broker first." : _plugins["homeassistant"].Error,
+                ["config"] = new JsonObject
+                {
+                    ["discoveryPrefix"] = config.HomeAssistant.DiscoveryPrefix,
+                    ["topicPrefix"] = config.Mqtt.TopicPrefix,
+                    ["mqttEnabled"] = config.Mqtt.Enabled,
+                },
+                ["rules"] = new JsonArray(),
+            };
+    }
+
+    public static HomeAssistantSettings HomeAssistantFrom(JsonObject p) =>
+        new((bool?)p["enabled"] ?? false, ((string?)p["config"]?["discoveryPrefix"] ?? "").Trim());
+
     void PluginResult(string id, Exception? error)
     {
         bool newFailure;
@@ -299,7 +344,7 @@ public sealed class UiHub : IEventSink
             state = _plugins[id] = (error is null ? "connected" : "error", error is null ? null : PluginMessage(id, error));
         }
         Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error });
-        if (newFailure) Problem?.Invoke(id == "obs" ? "ObsFailed" : "MqttFailed", "plugins");
+        if (newFailure && id != "homeassistant") Problem?.Invoke(id == "obs" ? "ObsFailed" : "MqttFailed", "plugins");
     }
 
     static string PluginMessage(string id, Exception e) => e switch

@@ -25,7 +25,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 - **Knockdowns** and **your death** in REDSEC
 - **Matches** in REDSEC: start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
-- **MQTT** for Home Assistant, Node-RED and other smart-home or automation tools
+- **MQTT** and **Home Assistant** (auto-discovered device with sensors and triggers), Node-RED and other automation tools
 - **Webhooks and scripts** for anything else
 - **Live monitor**: a picture of every kill, also in a window of its own for a second screen
 - **Auto-update**, German and English, light and dark
@@ -110,8 +110,18 @@ Under **Plugins → MQTT**, enter your broker (address, port, optional TLS, user
 |---|---|
 | `matchpulse/events/<type>` | every event as JSON, e.g. `matchpulse/events/kill` — subscribe to `matchpulse/events/+` for all |
 | `matchpulse/status` | `online` or `offline`, retained; the broker sets `offline` by Last Will if MatchPulse stops unexpectedly |
+| `matchpulse/state/match` · `kills` · `knockdowns` · `deaths` · `last_event` | the current match, retained: `ON`/`OFF`, counts in the match, the last event type |
 
-QoS 0, 1 or 2 can be chosen. In Home Assistant, for example, an automation with an MQTT trigger on `matchpulse/events/kill` can flash a light on every kill, and `matchpulse/status` serves as availability topic.
+QoS 0, 1 or 2 can be chosen.
+
+## Home Assistant
+
+Turn on **Plugins → Home Assistant** (with the MQTT plugin pointing at your Home Assistant's broker, e.g. the Mosquitto add-on). Through MQTT discovery a device **MatchPulse** appears in Home Assistant by itself, with:
+
+- **Sensors:** match running, kills, knockdowns and deaths in the match, last event, plus availability
+- **Device triggers** for automations: match started, kill, knockdown, death, match ended
+
+So an automation like *"when MatchPulse kill → flash the desk light red"* or *"when MatchPulse match started → turn off the doorbell chime"* takes a few clicks. Turning the plugin off removes the device again.
 
 ## OBS plugin
 
@@ -137,7 +147,6 @@ Every rule can wait a few seconds first — for example, save the replay buffer 
 
 ## Limits
 
-- MQTT: no Home Assistant auto-discovery yet; topics are set up by hand.
 - REDSEC: matches, kills, knockdowns, deaths. Regular multiplayer: kills only so far (round start and end, knockdowns, deaths and double kills follow).
 - 16:9 screens; ultrawide (21:9) is planned.
 - Death detection needs the German game language until an English *Spectating* image is added.

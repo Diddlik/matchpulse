@@ -37,6 +37,8 @@
       { id: 'mqtt', enabled: true, status: 'connected', lastError: null,
         config: { host: 'homeassistant.local', port: 1883, useTls: false, username: 'matchpulse', password: 'secret', topicPrefix: 'matchpulse', qos: 1 },
         rules: [] },
+      { id: 'homeassistant', enabled: true, status: 'connected', lastError: null,
+        config: { discoveryPrefix: 'homeassistant', topicPrefix: 'matchpulse', mqttEnabled: true }, rules: [] },
       { id: 'audio', enabled: false, status: 'ready',
         config: { apps: [{ name: 'Spotify.exe', volume: 20 }, { name: 'chrome.exe', volume: 40 }], restoreOnExit: true },
         rules: [
