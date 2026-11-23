@@ -19,7 +19,7 @@ public class MatchBoundaryTests
         Assert.Equal("match_ended", ended.Type);
         Assert.Equal(2, ended.Sequence);
         Assert.Equal(Start.AddSeconds(15), ended.OccurredAt);
-        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "game_exited" }, ended.Data);
+        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "game_exited", ["kills"] = "0" }, ended.Data);
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class MatchBoundaryTests
 
         Assert.Equal("match_ended", ended.Type);
         Assert.Equal(Start.AddSeconds(15), ended.OccurredAt);
-        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "stopped" }, ended.Data);
+        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "stopped", ["kills"] = "0" }, ended.Data);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class MatchBoundaryTests
         Assert.Equal(["match_started", "match_ended"], events.Select(e => e.Type));
         Assert.Equal(Start, events[0].OccurredAt);
         Assert.Equal(Start.AddSeconds(130), events[1].OccurredAt); // HUD last seen at 9 s
-        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "hud_lost" }, events[1].Data);
+        Assert.Equal(new Dictionary<string, string> { ["result"] = "unknown", ["reason"] = "hud_lost", ["kills"] = "0" }, events[1].Data);
         Assert.Equal([1, 2], events.Select(e => e.Sequence));
     }
 

@@ -14,10 +14,17 @@
       "data": {}
     },
     {
+      "type": "knockdown",
+      "offset": 1.4,
+      "data": {}
+    },
+    {
       "type": "kill",
       "offset": 2.3,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
-  "notes": "Player knocks vitormourauk (Kill Marker 1.4 s, Knockdown Badge 1.9 s), then kills Floky10452 outright (Kill Marker 2.3 s, Kill Badge 2.9 s), the last of that squad. The knocked vitormourauk dies in the squad wipe ('▸BulletWaltz X vitormourauk') and the game credits a second Kill Badge at 3.2 s without its own Kill Marker. One kill: each Kill Marker confirms at most one Kill Badge. Same open question as squad-kill-wipes-players-knock."
+  "notes": "Player knocks vitormourauk (Kill Marker 1.4 s, Knockdown Badge 1.9 s), then kills Floky10452 outright (Kill Marker 2.3 s, Kill Badge 2.9 s), the last of that squad. The knocked vitormourauk dies in the squad wipe ('▸BulletWaltz X vitormourauk') and the game credits a second Kill Badge at 3.2 s without its own Kill Marker. One kill: each Kill Marker confirms at most one Kill Badge. Same open question as squad-kill-wipes-players-knock. Knockdown (ticket 19): Kill Marker at 1.4 s and Knockdown Badge at 1.9 s; the Kill Feed shows the Player knocking down vitormourauk before killing Floky."
 }

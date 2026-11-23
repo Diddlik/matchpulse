@@ -12,7 +12,12 @@
       "type": "match_started",
       "offset": 0.0,
       "data": {}
+    },
+    {
+      "type": "death",
+      "offset": 8.8,
+      "data": {}
     }
   ],
-  "notes": "Player is downed and dies; in-match HUD absent 4.8-8.7 s, then the Player spectates a Squad member ('BEOBACHTE', 'WARTEN AUF WIEDEREINSATZ') and the counter bar is back (without the kill counter). Must not end the Match."
+  "notes": "Player is downed and dies; in-match HUD absent 4.8-8.7 s, then the Player spectates a Squad member ('BEOBACHTE', 'WARTEN AUF WIEDEREINSATZ') and the counter bar is back (without the kill counter). Must not end the Match. Death (ticket 19): the spectate label BEOBACHTE from 8.8 s."
 }

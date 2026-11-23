@@ -24,6 +24,14 @@ _Avoid_: team, party
 The Player finishing off an opponent, in any game mode. A Kill outside a Match (regular multiplayer) belongs to no Match.
 _Avoid_: elimination, frag
 
+**Knockdown**:
+The Player putting an opponent into the downed state without killing him. Finishing him later is a Kill of its own.
+_Avoid_: down, knock
+
+**Death**:
+The Player being eliminated from the Match (spectating the Squad afterwards). Being knocked down alone is not a Death.
+_Avoid_: elimination
+
 **Cue**:
 A visual element on screen whose presence tells MatchPulse that something happened or that the game is in a certain state.
 _Avoid_: marker, template, indicator

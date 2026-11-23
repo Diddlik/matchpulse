@@ -5,7 +5,7 @@ MatchPulse watches Battlefield 6 on screen and turns what happens into events: a
 MatchPulse only reads the screen, like recording software. It never reads from or writes to the game process.
 
 - **Kills** in every mode, also under a Jammer, without counting kills finished by the Squad
-- **Matches** in REDSEC (battle royale): start, victory, defeat
+- **Matches** in REDSEC (battle royale): start, victory, defeat, the Player's knockdowns and death
 - **Targets:** webhooks (HTTP POST with the event JSON) and scripts (event JSON on stdin)
 - **OBS plugin** over OBS WebSocket: recording, replay buffer, chapter markers, scenes, texts, overlays, streaming
 - **Live monitor:** a picture of every kill, also in a window of its own for a second screen
@@ -24,7 +24,7 @@ In MatchPulse, set the **Kill Marker colour** to the colour of the hit X in your
 { "type": "kill", "matchId": "91fdb6ce…", "sequence": 2, "occurredAt": "2026-11-23T20:18:40+01:00", "data": {} }
 ```
 
-`type` is `match_started`, `kill` or `match_ended` (`data.result`: `victory`, `defeat`, `unknown`; `data.reason`: `end_screen`, `hud_lost`, `game_exited`, `stopped`). Kills outside a REDSEC Match have `matchId: null`. Test events from the app have `type: "test"`.
+`type` is `match_started`, `kill` (`data.kills`: the Player's kills in the Match so far), `knockdown`, `death` or `match_ended` (`data.result`: `victory`, `defeat`, `unknown`; `data.reason`: `end_screen`, `hud_lost`, `game_exited`, `stopped`; `data.kills`). Knockdowns and deaths are reported in REDSEC; deaths for the German game language so far. Kills outside a REDSEC Match have `matchId: null`. Test events from the app have `type: "test"`.
 
 ## Build
 

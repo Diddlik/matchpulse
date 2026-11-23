@@ -16,7 +16,9 @@
     {
       "type": "kill",
       "offset": 1.7,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
   "notes": "Player kills an opponent outright. Kill Marker (red X) visible 1.7-1.8 s, kill counter increments with a green flash from 1.8 s, Kill Feed: '▸BulletWaltz [weapon] Star_Wars2567'."

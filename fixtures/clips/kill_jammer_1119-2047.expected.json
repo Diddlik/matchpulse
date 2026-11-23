@@ -11,7 +11,9 @@
     {
       "type": "kill",
       "offset": 2.1,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
   "notes": "Jammer active: counter bar and Kill Feed hidden, so no in-match HUD Cue and no match_started from this clip alone. Score Popup still visible: Knockdown Badge at ~1.5 s, Kill Badge at ~2.1 s. One kill, the knockdown must not produce one. A detector that requires an open Match will emit nothing here unless the Match was started earlier; test with an already-started Match."

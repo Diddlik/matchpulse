@@ -16,7 +16,9 @@
     {
       "type": "kill",
       "offset": 1.9,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
   "notes": "Player finishes a downed opponent. Kill Marker 1.9-2.0 s, counter 0->1 with green flash at ~2.1 s, Kill Feed '▸BulletWaltz [weapon] [skull] Pierghost747'."
