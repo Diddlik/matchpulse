@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" width="1200" height="430" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <g id="marker"><path d="M-10 -10l6 6M10 -10l-6 6M-10 10l6-6M10 10l-6-6" stroke="#ff3b3b" stroke-width="3.2" stroke-linecap="round"/><path d="M0 -4v8M-4 0h8" stroke="#f2f2f2" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="skull"><circle r="9" fill="#e6edf3"/><rect x="-5" y="5" width="10" height="6" rx="1.5" fill="#e6edf3"/><circle cx="-3.2" cy="-1" r="2.2" fill="#161b22"/><circle cx="3.2" cy="-1" r="2.2" fill="#161b22"/></g>
+    <g id="knock"><use href="#skull"/><path d="M14 -6v10M10 1l4 4 4-4" stroke="#e6edf3" stroke-width="2" fill="none" stroke-linecap="round"/></g>
+  </defs>
+  <rect width="1200" height="430" rx="18" fill="#0f1217"/>
+  <text x="40" y="48" font-size="20" font-weight="700" fill="#e6edf3">How a kill is told apart</text>
+  <text x="40" y="74" font-size="14" fill="#9198a1">The X shows on every hit that downs or kills, and the skull also shows when your Squad finishes your knockdown. Only both together, in this order, are your kill.</text>
+
+  <!-- rows -->
+  <g font-size="14">
+    <!-- row 1 -->
+    <g transform="translate(40 110)">
+      <rect width="1120" height="84" rx="12" fill="#161b22" stroke="#238636" stroke-width="1.5"/>
+      <line x1="230" y1="42" x2="720" y2="42" stroke="#30363d" stroke-width="2"/>
+      <use href="#marker" x="280" y="42"/><text x="262" y="74" font-size="12" fill="#9198a1">0 s</text>
+      <use href="#skull" x="480" y="42"/><text x="452" y="74" font-size="12" fill="#9198a1">≤ 1.5 s</text>
+      <path d="M300 42h160" stroke="#7d8590" stroke-dasharray="4 4"/>
+      <text x="24" y="38" font-weight="600" fill="#e6edf3">Your kill</text>
+      <text x="24" y="58" font-size="12.5" fill="#9198a1">X, then skull</text>
+      <rect x="770" y="27" width="64" height="30" rx="7" fill="#da3633" opacity="0.3"/><text x="790" y="47" font-weight="700" fill="#ff7b72">kill</text>
+      <text x="852" y="47" font-size="13" fill="#9198a1">sent at the skull, about 0.5 s later</text>
+    </g>
+    <!-- row 2 -->
+    <g transform="translate(40 206)">
+      <rect width="1120" height="84" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <line x1="230" y1="42" x2="720" y2="42" stroke="#30363d" stroke-width="2"/>
+      <use href="#marker" x="280" y="42"/>
+      <use href="#knock" x="480" y="42"/>
+      <path d="M300 42h160" stroke="#7d8590" stroke-dasharray="4 4"/>
+      <text x="24" y="38" font-weight="600" fill="#e6edf3">Your knockdown</text>
+      <text x="24" y="58" font-size="12.5" fill="#9198a1">X, then skull with arrow</text>
+      <rect x="770" y="27" width="104" height="30" rx="7" fill="#30363d"/><text x="784" y="47" font-weight="700" fill="#c9d1d9">knockdown</text>
+      <text x="892" y="47" font-size="13" fill="#9198a1">finishing him later: a kill too</text>
+    </g>
+    <!-- row 3 -->
+    <g transform="translate(40 302)">
+      <rect width="1120" height="84" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <line x1="230" y1="42" x2="720" y2="42" stroke="#30363d" stroke-width="2"/>
+      <circle cx="280" cy="42" r="12" fill="none" stroke="#484f58" stroke-width="2" stroke-dasharray="3 3"/>
+      <use href="#skull" x="480" y="42"/>
+      <text x="24" y="38" font-weight="600" fill="#e6edf3">Squad finished it</text>
+      <text x="24" y="58" font-size="12.5" fill="#9198a1">skull without your X</text>
+      <rect x="770" y="27" width="92" height="30" rx="7" fill="none" stroke="#484f58"/><text x="782" y="47" font-weight="600" fill="#7d8590">no event</text>
+      <text x="880" y="47" font-size="13" fill="#9198a1">not your kill</text>
+    </g>
+  </g>
+</svg>

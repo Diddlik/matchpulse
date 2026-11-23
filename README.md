@@ -1,32 +1,136 @@
-# MatchPulse
+<p align="center">
+  <img src="docs/images/icon.png" width="96" height="96" alt="MatchPulse icon">
+</p>
 
-MatchPulse watches Battlefield 6 on screen and turns what happens into events: a Match starts, the Player gets a Kill, a Match ends with victory or defeat. It sends each event to webhooks, scripts and OBS, so recordings, clips, overlays or statistics can follow the game by themselves.
+<h1 align="center">MatchPulse</h1>
 
-MatchPulse only reads the screen, like recording software. It never reads from or writes to the game process.
+<p align="center">
+  <b>Turns your Battlefield 6 matches into events — kills, knockdowns, deaths, match start and end — and hands them to OBS, webhooks and scripts.</b>
+</p>
 
-- **Kills** in every mode, also under a Jammer, without counting kills finished by the Squad
-- **Matches** in REDSEC (battle royale): start, victory, defeat, the Player's knockdowns and death
-- **Targets:** webhooks (HTTP POST with the event JSON) and scripts (event JSON on stdin)
-- **OBS plugin** over OBS WebSocket: recording, replay buffer, chapter markers, scenes, texts, overlays, streaming
-- **Live monitor:** a picture of every kill, also in a window of its own for a second screen
-- **Diagnostic mode:** pictures of unclear cases, to find missed kills
-- German and English, light and dark
+<p align="center">
+  <a href="https://github.com/Diddlik/matchpulse/releases/latest"><img src="https://img.shields.io/github/v/release/Diddlik/matchpulse?label=download&color=2ea043" alt="Latest release"></a>
+  <a href="https://github.com/Diddlik/matchpulse/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/Diddlik/matchpulse/build.yml?branch=main&label=build" alt="Build"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4" alt="Windows 10 and 11">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Diddlik/matchpulse?color=8957e5" alt="MIT licence"></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/screen-status.png" width="900" alt="MatchPulse overview: match running, kills this round, latest events, targets and problems">
+</p>
+
+MatchPulse runs quietly in the tray while you play. It watches the game on screen, recognises what happens and sends each moment as a small JSON event. Your recording software saves a clip of every kill, your overlay counts your kills, your script logs your matches — without you pressing a key.
+
+- **Kills** in every mode, also under a Jammer, without counting kills your Squad finishes
+- **Knockdowns** and **your death** in REDSEC
+- **Matches** in REDSEC: start, victory, defeat
+- **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
+- **Webhooks and scripts** for anything else
+- **Live monitor**: a picture of every kill, also in a window of its own for a second screen
+- **Auto-update**, German and English, light and dark
+
+## How it works
+
+<p align="center">
+  <img src="docs/images/how-it-works.svg" width="100%" alt="1 You play Battlefield 6. 2 MatchPulse captures small areas of the screen 5 to 10 times per second and recognises cues: the kill marker, the skull in the score popup, the match HUD, the victory or defeat emblem and the spectate label. 3 It creates a game event as JSON: match_started, kill, knockdown, death or match_ended. 4 Webhooks, scripts, the OBS plugin and the MatchPulse window react to it.">
+</p>
+
+MatchPulse does not touch the game. It only copies small areas of the screen, the way recording software does, and compares them with images of the game's HUD symbols (template matching with OpenCV). It works at any 16:9 resolution and needs no API, no log files and no overlay inside the game.
+
+### Telling your kills apart
+
+<p align="center">
+  <img src="docs/images/kill-rule.svg" width="100%" alt="Your kill: the red X around the crosshair, then within 1.5 seconds the skull in the score popup, gives a kill event. Your knockdown: the X, then the skull with an arrow, gives a knockdown event. Squad finished it: the skull without your X gives no event.">
+</p>
+
+The hit marker X appears on every hit that downs or kills, and the game shows the kill skull also when your Squad finishes an opponent you knocked down. Only your X followed by the skull counts as your kill. The X colour can be changed in the game, so you set the same colour in MatchPulse.
+
+## Screenshots
+
+| Events with their JSON | Targets: webhooks and scripts |
+|---|---|
+| <img src="docs/images/screen-events.png" alt="Events page: list of kills and match events with the selected event's JSON"> | <img src="docs/images/screen-sinks.png" alt="Targets page: webhooks and scripts with their last success, last failure and a test button"> |
+| **OBS plugin rules** | **Settings** |
+| <img src="docs/images/screen-plugins.png" alt="Plugins page: OBS connection and rules such as kill → save replay buffer"> | <img src="docs/images/screen-setup.png" alt="Settings page: game language, interface language, theme and kill marker colour with preview"> |
 
 ## Install
 
-Download `MatchPulse-Setup-<version>.exe` from [Releases](https://github.com/Diddlik/matchpulse/releases) and run it. No admin rights needed. MatchPulse then runs in the tray; double-click the icon to open it. Windows 10 (1809) or 11 with the Edge WebView2 Runtime (part of Windows 11).
+1. Download **`MatchPulse-Setup-<version>.exe`** from the [latest release](https://github.com/Diddlik/matchpulse/releases/latest) and run it. No admin rights needed.
+   The installer is not signed yet, so Windows SmartScreen may say *unknown publisher*: choose **More info → Run anyway**.
+2. MatchPulse starts in the tray. Double-click the icon to open it.
+3. In **Settings**, set the **kill marker colour** to the colour of the hit X in your game settings (red by default) and the **game language** (German or English).
+4. Start Battlefield 6. The tray icon turns orange when the game runs and green during a REDSEC match.
 
-In MatchPulse, set the **Kill Marker colour** to the colour of the hit X in your game settings (red by default).
+Requirements: Windows 10 (1809) or 11, x64, with the Edge WebView2 Runtime (included in Windows 11). Everything else is bundled. A portable zip is attached to every release too.
 
-## Event JSON
+## Events
+
+Every event is a JSON object, the same for every target:
 
 ```json
-{ "type": "kill", "matchId": "91fdb6ce…", "sequence": 2, "occurredAt": "2026-11-23T20:18:40+01:00", "data": {} }
+{
+  "type": "kill",
+  "matchId": "91fdb6ce4f2a4e0b9c1d7a3e52b8f0aa",
+  "sequence": 4,
+  "occurredAt": "2026-11-23T20:18:40.312+01:00",
+  "data": { "kills": "3" }
+}
 ```
 
-`type` is `match_started`, `kill` (`data.kills`: the Player's kills in the Match so far), `knockdown`, `death` or `match_ended` (`data.result`: `victory`, `defeat`, `unknown`; `data.reason`: `end_screen`, `hud_lost`, `game_exited`, `stopped`; `data.kills`). Knockdowns and deaths are reported in REDSEC; deaths for the German game language so far. Kills outside a REDSEC Match have `matchId: null`. Test events from the app have `type: "test"`.
+| `type` | When | `data` |
+|---|---|---|
+| `match_started` | a REDSEC match begins | – |
+| `kill` | you kill an opponent | `kills`: your kills in this match so far |
+| `knockdown` | you knock an opponent down (REDSEC) | – |
+| `death` | you are eliminated and spectate (REDSEC, German game language so far) | – |
+| `match_ended` | victory or defeat screen, game closed, or the HUD gone for 2 minutes | `result`: `victory`, `defeat`, `unknown`; `reason`: `end_screen`, `hud_lost`, `game_exited`, `stopped`; `kills` |
 
-## Build
+`matchId` groups the events of one match; kills in regular multiplayer have `matchId: null`. `sequence` counts the events of a match from 1. `occurredAt` is when the moment was first seen. The **Send test event** button sends `"type": "test"`.
+
+## Targets
+
+**Webhooks** receive every event as an HTTP `POST` with the JSON body.
+
+**Scripts** run once per event with the JSON on stdin. A PowerShell example that keeps a log of your kills:
+
+```powershell
+# kills.ps1 — add as target:  pwsh -NoProfile -File C:\Tools\kills.ps1
+$e = $input | Out-String | ConvertFrom-Json
+if ($e.type -eq 'kill') { "$($e.occurredAt)  kill #$($e.data.kills)" | Add-Content "$env:USERPROFILE\kills.txt" }
+```
+
+A failing, slow or hanging target never holds up detection or the other targets; its error shows on the Targets page.
+
+## OBS plugin
+
+MatchPulse controls OBS directly over **OBS WebSocket** (built into OBS 28 and later). In OBS, turn on *Tools → WebSocket Server Settings*, then enter address, port and password under **Plugins** in MatchPulse and add rules *"when event → action"*:
+
+| Action | Typical use |
+|---|---|
+| Save replay buffer *(optional file name)* | a clip of every kill, e.g. named `{date}_{match}_Kill-{kills}` |
+| Start / stop replay buffer, start / stop / pause / resume recording | record whole matches |
+| Split recording into a new file | one file per match |
+| Add chapter marker | jump to every kill in one long recording (OBS 30.2+, Hybrid MP4) |
+| Switch scene, set text, show a source for N seconds | overlays: kill counter, kill animation |
+| Start / stop stream | |
+
+Every rule can wait a few seconds first — for example, save the replay buffer 3 s after a kill, so the moment after it is in the clip. Placeholders: `{kills}`, `{match}`, `{n}`, `{result}`, `{date}`, `{time}`.
+
+## More
+
+- **Live monitor** — with it turned on, MatchPulse saves a picture of the screen at every kill and shows it at once, also in a window of its own that never takes the focus from the game.
+- **Diagnostic mode** — when a kill seems missing, MatchPulse saves a picture of every unclear moment (a skull without an X, an X without a skull) with the kill feed, so the cause can be found.
+- **Updates** — MatchPulse checks the releases at start and once a day, verifies the download's SHA-256 and installs it silently, never while the game runs. Both can be turned off.
+- **Privacy** — MatchPulse sends nothing anywhere except to the targets you add, and reads only `github.com/Diddlik/matchpulse/releases` for updates. Settings and pictures stay in `%APPDATA%\MatchPulse`.
+
+## Limits
+
+- REDSEC: matches, kills, knockdowns, deaths. Regular multiplayer: kills only so far (round start and end, knockdowns, deaths and double kills follow).
+- 16:9 screens; ultrawide (21:9) is planned.
+- Death detection needs the German game language until an English *Spectating* image is added.
+- A hit marker that shows for a single frame can be missed at 10 checks per second.
+
+## Build from source
 
 .NET SDK 11, Windows.
 
@@ -37,10 +141,12 @@ dotnet run --project src/MatchPulse -- live                   # detection in the
 dotnet run --project src/MatchPulse -- replay <video.mkv>     # detection on a recording
 ```
 
-The fixture clips (`fixtures/clips/*.mkv`) are cut from private recordings and are not in this repository; only their `.expected.json` files are. Without them, run `dotnet test --filter "FullyQualifiedName!~FixtureClipTests"`.
+The window is a plain HTML page in `src/MatchPulse/ui/`; open `index.html` in a browser to work on it with demo data. The fixture clips (`fixtures/clips/*.mkv`) are cut from private recordings and are not in this repository, only their `.expected.json` files; without them run `dotnet test --filter "FullyQualifiedName!~FixtureClipTests"`.
 
-A release is built by pushing a tag `v<version>`: GitHub Actions tests, publishes, builds the installer (Inno Setup, `installer/MatchPulse.iss`) and a portable zip, and attaches them to the release.
+Releases are built by GitHub Actions when a tag `v<version>` is pushed: tests, self-contained publish, installer (Inno Setup, `installer/MatchPulse.iss`), portable zip and `latest.json` for the updater.
 
-MIT licence, see `LICENSE`. Battlefield is a trademark of Electronic Arts; MatchPulse is not affiliated with EA.
+Design notes: [`GLOSSARY.md`](GLOSSARY.md), [`docs/adr/`](docs/adr), [`docs/ui-brief.md`](docs/ui-brief.md).
 
-Design notes: `GLOSSARY.md`, `docs/adr/`, `docs/ui-brief.md`, `.scratch/event-detection-mvp/`.
+## Licence
+
+MIT, see [`LICENSE`](LICENSE). Battlefield is a trademark of Electronic Arts. MatchPulse is not affiliated with or endorsed by EA.
