@@ -17,7 +17,9 @@ public static class GameWatcher
     /// <paramref name="config"/> is read each time <c>bf6.exe</c> starts, so changed settings apply from the next game run without restarting MatchPulse.
     /// When stopped during a Match, <c>match_ended</c> with <c>reason: stopped</c> is dispatched before returning.
     /// With <see cref="Config.Diagnostics"/>, unconfirmed Kill cases are saved to <see cref="DiagnosticSnapshots.DefaultFolder"/> (diagnostic mode).</summary>
-    public static void Run(Func<Config> config, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
+    /// With <see cref="Config.LiveMonitor"/> (read at each kill), a full-screen picture of each kill is saved to
+    /// <see cref="KillPictures.DefaultFolder"/> and reported to <paramref name="killPicture"/>.
+    public static void Run(Func<Config> config, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null, Action<GameEvent, string>? killPicture = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -42,16 +44,22 @@ public static class GameWatcher
                 detector.Unconfirmed += snapshots.Write;
                 log.LogInformation("Diagnostic mode: snapshots go to {Folder}", diagnosticsFolder);
             }
+            var pictures = new KillPictures(KillPictures.DefaultFolder, log);
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 try
                 {
                     var nextCheck = DateTimeOffset.MinValue;
-                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, snapshots is null ? null : DiagnosticSnapshots.Regions))
+                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, snapshots is null ? null : DiagnosticSnapshots.Regions, () => pictures.Wanted))
                         using (frame.Image)
                         {
+                            if (pictures.Save(frame) is { } saved) killPicture?.Invoke(saved.Kill, saved.Path);
                             snapshots?.Add(frame);
-                            foreach (var gameEvent in detector.Process(frame)) dispatch(gameEvent);
+                            foreach (var gameEvent in detector.Process(frame))
+                            {
+                                dispatch(gameEvent);
+                                if (gameEvent.Type == "kill" && config().LiveMonitor) pictures.Request(gameEvent);
+                            }
                             if (frame.Timestamp < nextCheck) continue;
                             if (!IsGameRunning()) break;
                             if (FindGameWindow() is var moved and not 0 && MonitorFromWindow(moved, MonitorDefaultToNearest) is var now && now != monitor)

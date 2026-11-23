@@ -20,7 +20,8 @@ public static class LiveFrameSource
         .Select(f => f.GetValue(null)).OfType<Cue>().ToArray();
 
     /// <param name="extraRegions">Screen areas (relative) captured in addition to the Cue regions, for diagnostic mode.</param>
-    public static IEnumerable<Frame> Read(IntPtr monitor, double checksPerSecond, CancellationToken stop, IReadOnlyList<Rect2d>? extraRegions = null)
+    /// <param name="fullFrame">Asked before each check: true captures the whole screen once (a kill picture).</param>
+    public static IEnumerable<Frame> Read(IntPtr monitor, double checksPerSecond, CancellationToken stop, IReadOnlyList<Rect2d>? extraRegions = null, Func<bool>? fullFrame = null)
     {
         if (checksPerSecond is < 5 or > 10)
             throw new ArgumentOutOfRangeException(nameof(checksPerSecond), checksPerSecond, "Must be between 5 and 10.");
@@ -32,9 +33,9 @@ public static class LiveFrameSource
             while (!stop.IsCancellationRequested)
             {
                 var next = DateTimeOffset.Now + interval;
-                var image = capture.Next();
+                var image = capture.Next(fullFrame?.Invoke() == true, out var full);
                 if (image is null) break; // access lost, e.g. a display mode change: open again
-                yield return new Frame(DateTimeOffset.Now, image);
+                yield return new Frame(DateTimeOffset.Now, image) { Full = full };
                 var wait = next - DateTimeOffset.Now;
                 if (wait > TimeSpan.Zero) stop.WaitHandle.WaitOne(wait);
             }
@@ -84,9 +85,11 @@ public static class LiveFrameSource
             throw new InvalidOperationException($"No DXGI output for monitor {monitor}.");
         }
 
-        /// <summary>The current screen with only the Cue regions filled, or null when access was lost.</summary>
-        public Mat? Next()
+        /// <summary>The current screen with only the Cue regions filled, or null when access was lost.
+        /// With <paramref name="wantFull"/>, the whole screen when a new desktop image arrived (<paramref name="full"/>).</summary>
+        public Mat? Next(bool wantFull, out bool full)
         {
+            full = false;
             var result = _duplication.AcquireNextFrame(100, out _, out var resource);
             if (result == Vortice.DXGI.ResultCode.AccessLost) return null;
             if (result.Success)
@@ -95,9 +98,14 @@ public static class LiveFrameSource
                 // has not changed and the staging texture still holds the last regions.
                 using (resource)
                 using (var texture = resource.QueryInterface<ID3D11Texture2D>())
-                    foreach (var r in _regions)
-                        _context.CopySubresourceRegion(_staging, 0, (uint)r.X, (uint)r.Y, 0, texture, 0,
-                            new Box(r.X, r.Y, 0, r.Right, r.Bottom, 1));
+                {
+                    full = wantFull;
+                    if (full) _context.CopyResource(_staging, texture);
+                    else
+                        foreach (var r in _regions)
+                            _context.CopySubresourceRegion(_staging, 0, (uint)r.X, (uint)r.Y, 0, texture, 0,
+                                new Box(r.X, r.Y, 0, r.Right, r.Bottom, 1));
+                }
                 _duplication.ReleaseFrame();
             }
             else if (result != Vortice.DXGI.ResultCode.WaitTimeout) result.CheckError();
@@ -107,9 +115,11 @@ public static class LiveFrameSource
             try
             {
                 using var bgra = Mat.FromPixelData(_height, _width, MatType.CV_8UC4, mapped.DataPointer, (long)mapped.RowPitch);
-                foreach (var r in _regions)
-                    using (var target = image[r])
-                        Cv2.CvtColor(bgra[r], target, ColorConversionCodes.BGRA2BGR);
+                if (full) Cv2.CvtColor(bgra, image, ColorConversionCodes.BGRA2BGR);
+                else
+                    foreach (var r in _regions)
+                        using (var target = image[r])
+                            Cv2.CvtColor(bgra[r], target, ColorConversionCodes.BGRA2BGR);
             }
             finally
             {

@@ -45,8 +45,8 @@
   const X_ICON = '<svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.4"/></svg>';
   const WARN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3l10 18H2z" fill="none" stroke="var(--warn)" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v5M12 18v.5" stroke="var(--warn)" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const OK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  // 'live' and 'plugins' are designed but not built in the app yet: shown only in the browser preview (mock).
-  const NAV = ['status', 'events', 'live', 'sinks', 'plugins', 'setup', 'diag', 'log'].filter((p) => B.isMock || (p !== 'live' && p !== 'plugins'));
+  // 'plugins' is designed but not built in the app yet: shown only in the browser preview (mock).
+  const NAV = ['status', 'events', 'live', 'sinks', 'plugins', 'setup', 'diag', 'log'].filter((p) => B.isMock || p !== 'plugins');
   const SWATCHES = [['#FF3030', 'c_red'], ['#FFE000', 'c_yellow'], ['#30FF60', 'c_green'], ['#00E5FF', 'c_cyan'], ['#FF40FF', 'c_magenta'], ['#FFFFFF', 'c_white']];
 
   // ---------- Zustand ----------

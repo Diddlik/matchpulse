@@ -8,19 +8,20 @@ namespace MatchPulse;
 
 /// <summary>
 /// The state behind the main window (<c>ui/</c>, see its README for the messages): Game Events, Match, Event Sink
-/// health, log, diagnostics. It lives as long as the app, so the window shows the history when it opens.
+/// health, log, diagnostics, kill pictures. It lives as long as the app, so the window shows the history when it opens.
 /// Host → UI messages go out through <see cref="Post"/>; UI → host messages come in through <see cref="Receive"/>.
 /// All members are thread-safe; <see cref="Post"/> and <see cref="Problem"/> are raised on the calling thread.
 /// </summary>
 public sealed class UiHub : IEventSink
 {
     const int MaxEvents = 500, MaxLog = 1000;
+    /// <summary>Serves the data folder to the window: <c>diagnostics/</c> and <c>kills/</c>.</summary>
     public const string ImageHost = "matchpulse.local";
 
     readonly Func<Config> _config;
     readonly Action<Config> _apply;
     readonly Func<Config, IEnumerable<IEventSink>> _sinks;
-    readonly string _diagnosticsFolder;
+    readonly string _dataFolder, _diagnosticsFolder, _killsFolder;
     readonly Lock _lock = new();
     readonly List<JsonNode> _events = [];
     readonly List<JsonNode> _logLines = [];
@@ -34,16 +35,24 @@ public sealed class UiHub : IEventSink
     /// <param name="config">The current settings.</param>
     /// <param name="apply">Saves and applies new settings; throws <see cref="InvalidDataException"/> when they are invalid.</param>
     /// <param name="sinks">Builds the Event Sinks of a config (used for test events).</param>
-    public UiHub(Func<Config> config, Action<Config> apply, Func<Config, IEnumerable<IEventSink>> sinks, string diagnosticsFolder)
+    /// <param name="dataFolder">Holds <c>diagnostics/</c> and <c>kills/</c>, served under <see cref="ImageHost"/>.</param>
+    public UiHub(Func<Config> config, Action<Config> apply, Func<Config, IEnumerable<IEventSink>> sinks, string dataFolder)
     {
         _config = config;
         _apply = apply;
         _sinks = sinks;
-        _diagnosticsFolder = diagnosticsFolder;
+        _dataFolder = dataFolder;
+        _diagnosticsFolder = Path.Combine(dataFolder, "diagnostics");
+        _killsFolder = Path.Combine(dataFolder, "kills");
     }
+
+    public string DataFolder => _dataFolder;
 
     /// <summary>A message for the window: type and payload.</summary>
     public event Action<string, JsonNode?>? Post;
+
+    /// <summary>The window asks for a page in a window of its own (the live monitor).</summary>
+    public event Action<string>? WindowRequested;
 
     /// <summary>A problem the Player should be told about outside the window: problem key and the page that shows it.</summary>
     public event Action<string, string>? Problem;
@@ -112,6 +121,10 @@ public sealed class UiHub : IEventSink
         if (newFailure) Problem?.Invoke("SinkFailed", "sinks");
     }
 
+    /// <summary>A kill picture was saved (live monitor).</summary>
+    public void KillPicture(GameEvent kill, string path) =>
+        Send("killHighlight", Highlight(Path.GetFileName(path)));
+
     /// <summary>A log line (from <see cref="FileLog.Written"/>).</summary>
     public void Logged(DateTimeOffset at, LogLevel level, string message)
     {
@@ -158,7 +171,9 @@ public sealed class UiHub : IEventSink
                 foreach (var file in DiagnosticFiles()) TryDelete(file);
                 Send("diagnostics", Diagnostics());
                 break;
-            // Live monitor and plugins are not built yet; their pages are hidden.
+            case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
+            case "openLiveWindow": WindowRequested?.Invoke("live"); break;
+            // Plugins are not built yet; their page is hidden.
         }
     }
 
@@ -175,7 +190,7 @@ public sealed class UiHub : IEventSink
                 ["sinks"] = Sinks(config),
                 ["plugins"] = new JsonArray(),
                 ["settings"] = Settings(config),
-                ["highlights"] = new JsonArray(),
+                ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
                 ["log"] = new JsonArray([.. _logLines.Select(l => l.DeepClone())]),
             };
@@ -263,7 +278,7 @@ public sealed class UiHub : IEventSink
         ["matchEndWithoutHudSeconds"] = config.HudLostAfterSeconds,
         ["diagnosticMode"] = config.Diagnostics,
         ["notifyOnProblems"] = config.NotifyOnProblems,
-        ["liveMonitor"] = false,
+        ["liveMonitor"] = config.LiveMonitor,
     };
 
     public static Config SettingsFrom(Config config, JsonObject s) => config with
@@ -276,6 +291,7 @@ public sealed class UiHub : IEventSink
         HudLostAfterSeconds = (double?)s["matchEndWithoutHudSeconds"] ?? config.HudLostAfterSeconds,
         Diagnostics = (bool?)s["diagnosticMode"] ?? config.Diagnostics,
         NotifyOnProblems = (bool?)s["notifyOnProblems"] ?? config.NotifyOnProblems,
+        LiveMonitor = (bool?)s["liveMonitor"] ?? config.LiveMonitor,
     };
 
     /// <summary>The config with the window's list of Event Sinks. A malformed webhook URL makes the config invalid.</summary>
@@ -313,9 +329,24 @@ public sealed class UiHub : IEventSink
             ["id"] = name,
             ["capturedAt"] = at,
             ["kind"] = name.Contains("kill_badge_without_kill_marker") ? "skull_without_marker" : "marker_without_skull",
-            ["imageUrl"] = $"https://{ImageHost}/{Uri.EscapeDataString(name)}",
+            ["imageUrl"] = $"https://{ImageHost}/diagnostics/{Uri.EscapeDataString(name)}",
         };
     })]);
+
+    /// <summary>Kill pictures, oldest first.</summary>
+    public JsonArray Highlights() => new([..
+        (Directory.Exists(_killsFolder) ? Directory.EnumerateFiles(_killsFolder, "*.jpg") : [])
+            .Select(Path.GetFileName).Order().Select(name => Highlight(name!)).OfType<JsonNode>()]);
+
+    static JsonObject? Highlight(string name) => KillPictures.Parse(name) is { } p
+        ? new JsonObject
+        {
+            ["matchId"] = p.MatchId,
+            ["sequence"] = p.Sequence,
+            ["capturedAt"] = p.At,
+            ["imageUrl"] = $"https://{ImageHost}/kills/{Uri.EscapeDataString(name)}",
+        }
+        : null;
 
     static void TryDelete(string file)
     {

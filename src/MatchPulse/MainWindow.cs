@@ -9,7 +9,8 @@ namespace MatchPulse;
 
 /// <summary>
 /// The main window: the HTML UI in <c>ui/</c> inside WebView2, connected to the <see cref="UiHub"/>.
-/// Diagnostic snapshots are served from <see cref="UiHub.ImageHost"/>.
+/// Diagnostic snapshots and kill pictures are served from <see cref="UiHub.ImageHost"/>. A passive window (the live
+/// monitor on a second screen) never takes the focus when it opens.
 /// </summary>
 sealed class MainWindow : Form
 {
@@ -18,25 +19,28 @@ sealed class MainWindow : Form
 
     readonly UiHub _hub;
     readonly WebView2 _view = new() { Dock = DockStyle.Fill };
-    readonly string _diagnosticsFolder;
+    readonly bool _passive;
     string? _startPage;
     bool _ready;
 
-    public MainWindow(UiHub hub, string diagnosticsFolder, Icon icon, string? startPage = null)
+    public MainWindow(UiHub hub, Icon icon, string? startPage = null, bool passive = false)
     {
         _hub = hub;
-        _diagnosticsFolder = diagnosticsFolder;
         _startPage = startPage;
-        Text = "MatchPulse";
+        _passive = passive;
+        Text = passive ? "MatchPulse – Live" : "MatchPulse";
         Icon = icon;
-        ClientSize = new Size(1240, 820);
+        ClientSize = passive ? new Size(1100, 760) : new Size(1240, 820);
         MinimumSize = new Size(760, 520);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(0x16, 0x18, 0x1c);
         Controls.Add(_view);
+        if (passive) StartPosition = FormStartPosition.WindowsDefaultLocation;
         Load += async (_, _) => await StartAsync();
         FormClosed += (_, _) => _hub.Post -= OnPost;
     }
+
+    protected override bool ShowWithoutActivation => _passive;
 
     /// <summary>Shows a page, e.g. after a click on a problem notification.</summary>
     public void Navigate(string page)
@@ -64,9 +68,9 @@ sealed class MainWindow : Form
         core.Settings.AreDevToolsEnabled = System.Diagnostics.Debugger.IsAttached;
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
-        Directory.CreateDirectory(_diagnosticsFolder);
+        Directory.CreateDirectory(_hub.DataFolder);
         core.SetVirtualHostNameToFolderMapping(AppHost, Path.Combine(AppContext.BaseDirectory, "ui"), CoreWebView2HostResourceAccessKind.DenyCors);
-        core.SetVirtualHostNameToFolderMapping(UiHub.ImageHost, _diagnosticsFolder, CoreWebView2HostResourceAccessKind.DenyCors);
+        core.SetVirtualHostNameToFolderMapping(UiHub.ImageHost, _hub.DataFolder, CoreWebView2HostResourceAccessKind.DenyCors);
         // The UI never leaves its own pages.
         core.NavigationStarting += (_, e) => e.Cancel = !e.Uri.StartsWith($"https://{AppHost}/", StringComparison.OrdinalIgnoreCase);
         core.NewWindowRequested += (_, e) => e.Handled = true;
