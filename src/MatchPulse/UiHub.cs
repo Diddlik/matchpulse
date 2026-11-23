@@ -435,7 +435,10 @@ public sealed class UiHub : IEventSink
         lock (_lock)
         {
             newFailure = error is not null && _plugins[id].Status != "error";
-            state = _plugins[id] = (error is null ? (id == "sound" ? "ready" : "connected") : "error", error is null ? null : PluginMessage(id, error));
+            // Reached, but a rule failed (OBS answered with an error code, WLED with an HTTP status): not a connection problem.
+            var ruleFailed = error is ObsException { Code: not null } or HttpRequestException { StatusCode: not null };
+            state = _plugins[id] = (error is null ? (id == "sound" ? "ready" : "connected") : ruleFailed ? "ruleFailed" : "error",
+                error is null ? null : PluginMessage(id, error));
         }
         Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error });
         if (newFailure && id != "homeassistant")
@@ -445,6 +448,7 @@ public sealed class UiHub : IEventSink
     static string PluginMessage(string id, Exception e) => e switch
     {
         ObsException or MqttRefusedException => e.Message,
+        HttpRequestException { StatusCode: not null } => e.Message,
         WebSocketException or OperationCanceledException or System.Net.Sockets.SocketException or HttpRequestException => id switch
         {
             "obs" => "OBS is not reachable.",

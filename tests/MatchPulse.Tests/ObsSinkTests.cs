@@ -140,7 +140,10 @@ public sealed class ObsSinkTests : IDisposable
         await new ObsSink(Settings("secret", new ObsRule("r1", "match_started", "start_recording"))).SendAsync(Event("match_started"), default);
         var error = await Assert.ThrowsAsync<ObsException>(() => new ObsSink(Settings("secret", new ObsRule("r2", "kill", "save_replay"))).SendAsync(Event("kill"), default));
 
-        Assert.Contains("SaveReplayBuffer", error.Message);
+        // The replay buffer was off: MatchPulse starts it so the next kills are saved, and says so.
+        Assert.Equal(501, error.Code);
+        Assert.Contains("replay buffer was off", error.Message);
+        Assert.Equal(["StartRecord", "SaveReplayBuffer", "StartReplayBuffer"], _obs.Requests.Select(r => r.Type));
     }
 
     [Fact]

@@ -30,7 +30,16 @@ public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEve
 
     public WledSettings Settings => settings;
 
-    string Url => $"http://{settings.Host.Trim().TrimEnd('/')}/json";
+    string Url => BaseUrl(settings.Host);
+
+    /// <summary>"192.168.1.50", "http://192.168.1.50/" or "wled.local" all become "http://host/json".</summary>
+    static string BaseUrl(string host)
+    {
+        var h = host.Trim();
+        if (h.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) h = h[7..];
+        else if (h.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) h = h[8..];
+        return $"http://{h.Split('/')[0]}/json";
+    }
 
     public async Task SendAsync(GameEvent gameEvent, CancellationToken cancellationToken)
     {
@@ -41,7 +50,7 @@ public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEve
     /// <summary>Asks the controller for its name and version; throws when it cannot be reached.</summary>
     public static async Task<string> TestAsync(HttpClient http, WledSettings settings, CancellationToken cancellationToken)
     {
-        var info = await http.GetFromJsonAsync<JsonObject>($"http://{settings.Host.Trim().TrimEnd('/')}/json/info", cancellationToken);
+        var info = await http.GetFromJsonAsync<JsonObject>($"{BaseUrl(settings.Host)}/info", cancellationToken);
         return $"{(string?)info?["name"] ?? "WLED"} {(string?)info?["ver"]}".Trim();
     }
 
@@ -115,8 +124,11 @@ public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEve
 
     async Task PostAsync(JsonObject state, CancellationToken cancellationToken)
     {
-        using var response = await http.PostAsJsonAsync($"{Url}/state", state, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        // With a fixed length: WLED's web server (ESP8266/ESP32) answers 400 to a chunked request body.
+        using var body = new StringContent(state.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
+        using var response = await http.PostAsync($"{Url}/state", body, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"WLED answered {(int)response.StatusCode} {response.ReasonPhrase}.", null, response.StatusCode);
     }
 
     public override string ToString() => $"WLED {settings.Host}";
