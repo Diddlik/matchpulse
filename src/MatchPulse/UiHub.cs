@@ -146,6 +146,9 @@ public sealed class UiHub : IEventSink
         if (newFailure) Problem?.Invoke("SinkFailed", "sinks");
     }
 
+    /// <summary>Settings changed outside the window (the hotkey); the window shows them.</summary>
+    public void SettingsChanged() => Send("settings", Settings(_config()));
+
     /// <summary>A kill picture was saved (live monitor).</summary>
     public void KillPicture(GameEvent kill, string path) =>
         Send("killHighlight", Highlight(Path.GetFileName(path)));
@@ -206,6 +209,7 @@ public sealed class UiHub : IEventSink
             case "testPlugin" when (string?)payload!["id"] == "wled": _ = TestWledAsync(_config().Wled); break;
             case "savePlugin" when (string?)payload!["id"] == "sound": Apply(_config() with { Sound = SoundFrom(payload!.AsObject()) }); break;
             case "testRule": _ = TestRuleAsync((string?)payload!["id"], (string?)payload["ruleId"]); break;
+            case "setActive": Apply(_config() with { Active = (bool?)payload!["active"] ?? true }); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
             case "checkUpdates" when _updates is not null: _ = _updates.CheckAsync(); break;
@@ -562,6 +566,8 @@ public sealed class UiHub : IEventSink
         ["diagnosticMode"] = config.Diagnostics,
         ["notifyOnProblems"] = config.NotifyOnProblems,
         ["liveMonitor"] = config.LiveMonitor,
+        ["active"] = config.Active,
+        ["toggleHotkey"] = config.ToggleHotkey,
         ["checkForUpdates"] = config.CheckForUpdates,
         ["autoInstallUpdates"] = config.AutoInstallUpdates,
     };
@@ -577,6 +583,8 @@ public sealed class UiHub : IEventSink
         Diagnostics = (bool?)s["diagnosticMode"] ?? config.Diagnostics,
         NotifyOnProblems = (bool?)s["notifyOnProblems"] ?? config.NotifyOnProblems,
         LiveMonitor = (bool?)s["liveMonitor"] ?? config.LiveMonitor,
+        Active = (bool?)s["active"] ?? config.Active,
+        ToggleHotkey = ((string?)s["toggleHotkey"] ?? config.ToggleHotkey).Trim(),
         CheckForUpdates = (bool?)s["checkForUpdates"] ?? config.CheckForUpdates,
         AutoInstallUpdates = (bool?)s["autoInstallUpdates"] ?? config.AutoInstallUpdates,
     };

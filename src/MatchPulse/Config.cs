@@ -29,7 +29,9 @@ public sealed record Config(
     MqttSettings? Mqtt = null,
     HomeAssistantSettings? HomeAssistant = null,
     WledSettings? Wled = null,
-    SoundSettings? Sound = null)
+    SoundSettings? Sound = null,
+    bool Active = true,
+    string ToggleHotkey = "Ctrl+Alt+M")
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -97,6 +99,8 @@ public sealed record Config(
             throw new InvalidDataException($"{path}: a WLED rule has an unknown event, action or effect, a colour not like #FF0000, a flash outside 0.1-30 s or a preset outside 1-250.");
         if (Sound.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || string.IsNullOrWhiteSpace(r.Sound) || r.Volume is < 0 or > 100))
             throw new InvalidDataException($"{path}: a sound rule has an unknown event, no sound or a volume outside 0-100.");
+        if (ToggleHotkey is null || ToggleHotkey != "" && Hotkey.Parse(ToggleHotkey) is null)
+            throw new InvalidDataException($"{path}: \"toggleHotkey\" must be like Ctrl+Alt+M (or empty for none).");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }

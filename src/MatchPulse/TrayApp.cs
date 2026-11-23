@@ -18,6 +18,7 @@ sealed class TrayApp : ApplicationContext
         [TrayState.GameRunning] = Dot(Color.Orange),
         [TrayState.MatchRunning] = Dot(Color.LimeGreen),
     };
+    static readonly Icon PausedIcon = Paused();
 
     readonly string _configPath;
     readonly ILogger _log;
@@ -31,6 +32,7 @@ sealed class TrayApp : ApplicationContext
     readonly CancellationTokenSource _stop = new();
     readonly Thread _watcher;
     MainWindow? _window, _liveWindow;
+    Hotkey? _hotkey;
     string _balloonPage = "status";
 
     public TrayApp(string configPath, FileLog file, ILogger log, bool showWindow = false, WaitHandle? showRequested = null)
@@ -67,6 +69,8 @@ sealed class TrayApp : ApplicationContext
             }, _hub.KillPicture))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
+        _hotkey = new Hotkey(() => SetActive(!Config.Active));
+        RegisterHotkey();
         StartUpdates();
         if (showWindow) ShowWindow();
         if (showRequested is not null)
@@ -87,7 +91,13 @@ sealed class TrayApp : ApplicationContext
     void Apply(Config config)
     {
         config.Save(_configPath);
+        var before = Config;
         Config = config;
+        _ui.Post(_ =>
+        {
+            if (before.Active != config.Active) ShowActive();
+            if (before.ToggleHotkey != config.ToggleHotkey) RegisterHotkey();
+        }, null);
         Dispatcher.ReplaceSinks(Sinks());
         _log.LogInformation("Settings applied: game language {Language}, Kill Marker colour {Color}, {Webhooks} webhook(s), {Scripts} script(s)",
             config.GameLanguage, config.KillMarkerColor, config.Webhooks.Count, config.Scripts.Count);
@@ -130,6 +140,37 @@ sealed class TrayApp : ApplicationContext
         catch (UnauthorizedAccessException) { }
     }
 
+    /// <summary>Turns MatchPulse on or off (hotkey, tray menu); the window follows.</summary>
+    void SetActive(bool active)
+    {
+        if (active == Config.Active) return;
+        try
+        {
+            Apply(Config with { Active = active });
+            _hub.SettingsChanged();
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            _log.LogError(e, "Could not switch MatchPulse {State}", active ? "on" : "off");
+        }
+    }
+
+    void ShowActive()
+    {
+        _log.LogInformation("MatchPulse {State}", Config.Active ? "activated" : "deactivated");
+        Overlay.Show(Ui.T(Config.UiLanguage, Config.Active ? "Activated" : "Deactivated"), Config.Active ? Color.LimeGreen : Color.Gray);
+        RefreshTray();
+    }
+
+    void RegisterHotkey()
+    {
+        if (_hotkey is null) return;
+        if (!_hotkey.Set(Config.ToggleHotkey))
+            _log.LogWarning("Hotkey {Hotkey} could not be registered: another program probably uses it", Config.ToggleHotkey);
+        else if (Config.ToggleHotkey != "")
+            _log.LogInformation("Hotkey {Hotkey} turns MatchPulse on and off", Config.ToggleHotkey);
+    }
+
     void ShowWindow(string? page = null)
     {
         if (_window is { IsDisposed: false })
@@ -164,6 +205,11 @@ sealed class TrayApp : ApplicationContext
         _tray.ContextMenuStrip?.Dispose();
         _tray.ContextMenuStrip = new ContextMenuStrip();
         _tray.ContextMenuStrip.Items.Add(T("Open"), null, (_, _) => ShowWindow());
+        _tray.ContextMenuStrip.Items.Add(new ToolStripMenuItem(T("Active"), null, (_, _) => SetActive(!Config.Active))
+        {
+            Checked = Config.Active,
+            ShortcutKeyDisplayString = Config.ToggleHotkey,
+        });
         _tray.ContextMenuStrip.Items.Add(T("Exit"), null, (_, _) => ExitThread());
         ShowState();
     }
@@ -171,13 +217,14 @@ sealed class TrayApp : ApplicationContext
     void ShowState()
     {
         var state = Status.State;
-        _tray.Icon = Icons[state];
-        _tray.Text = $"MatchPulse - {Ui.T(Config.UiLanguage, state.ToString())}";
+        _tray.Icon = Config.Active ? Icons[state] : PausedIcon;
+        _tray.Text = $"MatchPulse - {Ui.T(Config.UiLanguage, Config.Active ? state.ToString() : "Paused")}";
     }
 
     protected override void ExitThreadCore()
     {
         _updateTimer?.Dispose();
+        _hotkey?.Dispose();
         _window?.Close();
         _liveWindow?.Close();
         _tray.Visible = false;
@@ -188,6 +235,22 @@ sealed class TrayApp : ApplicationContext
         _http.Dispose();
         _download.Dispose();
         base.ExitThreadCore();
+    }
+
+    // Paused: a grey ring with two pause bars.
+    static Icon Paused()
+    {
+        using var bitmap = new Bitmap(16, 16);
+        using (var g = Graphics.FromImage(bitmap))
+        using (var pen = new Pen(Color.Gray, 2))
+        using (var bars = new SolidBrush(Color.Gray))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.DrawEllipse(pen, 1, 1, 13, 13);
+            g.FillRectangle(bars, 5, 4, 2, 8);
+            g.FillRectangle(bars, 9, 4, 2, 8);
+        }
+        return Icon.FromHandle(bitmap.GetHicon());
     }
 
     static Icon Dot(Color color)
