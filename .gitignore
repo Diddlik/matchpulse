@@ -6,3 +6,5 @@ obj/
 TestResults/
 publish/
 artifacts/
+# Fixture clips are cut from private recordings: kept locally, not published.
+fixtures/clips/*.mkv

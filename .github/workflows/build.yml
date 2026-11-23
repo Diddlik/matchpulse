@@ -20,8 +20,9 @@ jobs:
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 11.0.x
+      # The fixture clips are not in the public repo, so their replay tests run only locally.
       - name: Test
-        run: dotnet test MatchPulse.slnx -c Release
+        run: dotnet test MatchPulse.slnx -c Release --filter "FullyQualifiedName!~FixtureClipTests"
 
   release:
     needs: test

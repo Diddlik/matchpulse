@@ -37,6 +37,10 @@ dotnet run --project src/MatchPulse -- live                   # detection in the
 dotnet run --project src/MatchPulse -- replay <video.mkv>     # detection on a recording
 ```
 
+The fixture clips (`fixtures/clips/*.mkv`) are cut from private recordings and are not in this repository; only their `.expected.json` files are. Without them, run `dotnet test --filter "FullyQualifiedName!~FixtureClipTests"`.
+
 A release is built by pushing a tag `v<version>`: GitHub Actions tests, publishes, builds the installer (Inno Setup, `installer/MatchPulse.iss`) and a portable zip, and attaches them to the release.
+
+MIT licence, see `LICENSE`. Battlefield is a trademark of Electronic Arts; MatchPulse is not affiliated with EA.
 
 Design notes: `GLOSSARY.md`, `docs/adr/`, `docs/ui-brief.md`, `.scratch/event-detection-mvp/`.
