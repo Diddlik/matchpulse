@@ -27,7 +27,9 @@ public sealed record Config(
     bool CheckForUpdates = true,
     bool AutoInstallUpdates = true,
     MqttSettings? Mqtt = null,
-    HomeAssistantSettings? HomeAssistant = null)
+    HomeAssistantSettings? HomeAssistant = null,
+    WledSettings? Wled = null,
+    SoundSettings? Sound = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -44,6 +46,10 @@ public sealed record Config(
     public MqttSettings Mqtt { get; init; } = Mqtt ?? new MqttSettings();
 
     public HomeAssistantSettings HomeAssistant { get; init; } = HomeAssistant ?? new HomeAssistantSettings();
+
+    public WledSettings Wled { get; init; } = Wled ?? new WledSettings();
+
+    public SoundSettings Sound { get; init; } = Sound ?? new SoundSettings();
 
     public static Config LoadOrDefault(string path) => File.Exists(path) ? Load(path) : new Config([]);
 
@@ -86,6 +92,11 @@ public sealed record Config(
             throw new InvalidDataException($"{path}: the MQTT topic prefix must not be empty, contain # or +, or end with /.");
         if (string.IsNullOrWhiteSpace(HomeAssistant.DiscoveryPrefix) || HomeAssistant.DiscoveryPrefix.IndexOfAny(['#', '+']) >= 0 || HomeAssistant.DiscoveryPrefix.EndsWith('/'))
             throw new InvalidDataException($"{path}: the Home Assistant discovery prefix must not be empty, contain # or +, or end with /.");
+        if (Wled.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || !WledSettings.Actions.Contains(r.Action) || !WledSettings.Effects.Contains(r.Effect)
+                || !Regex.IsMatch(r.Color ?? "", "^#[0-9A-Fa-f]{6}$") || r.DurationSeconds is < 0.1 or > 30 || r.Preset is < 1 or > 250))
+            throw new InvalidDataException($"{path}: a WLED rule has an unknown event, action or effect, a colour not like #FF0000, a flash outside 0.1-30 s or a preset outside 1-250.");
+        if (Sound.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || string.IsNullOrWhiteSpace(r.Sound) || r.Volume is < 0 or > 100))
+            throw new InvalidDataException($"{path}: a sound rule has an unknown event, no sound or a volume outside 0-100.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }

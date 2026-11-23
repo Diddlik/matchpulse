@@ -12,6 +12,8 @@ static class Ui
         ["SinkFailed"] = ("Ein Ziel hat ein Ereignis nicht angenommen. Klicken für Details.", "A target did not accept an event. Click for details."),
         ["CaptureFailed"] = ("Die Bildschirmaufnahme ist fehlgeschlagen und wird wiederholt.", "Screen capture failed and is being retried."),
         ["MqttFailed"] = ("MQTT: Ereignis nicht gesendet. Klicken für Details.", "MQTT: an event was not sent. Click for details."),
+        ["WledFailed"] = ("WLED hat eine Regel nicht ausgeführt. Klicken für Details.", "WLED did not run a rule. Click for details."),
+        ["SoundFailed"] = ("Ein Sound konnte nicht abgespielt werden. Klicken für Details.", "A sound could not be played. Click for details."),
         ["ObsFailed"] = ("OBS hat eine Regel nicht ausgeführt. Klicken für Details.", "OBS did not run a rule. Click for details."),
         ["UpdateAvailable"] = ("Eine neue Version von MatchPulse ist verfügbar. Klicken zum Installieren.", "A new version of MatchPulse is available. Click to install."),
         ["Updated"] = ("MatchPulse wurde auf Version {0} aktualisiert.", "MatchPulse was updated to version {0}."),

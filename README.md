@@ -26,6 +26,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 - **Matches** in REDSEC: start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
 - **MQTT** and **Home Assistant** (auto-discovered device with sensors and triggers), Node-RED and other automation tools
+- **WLED lights** that flash on a kill, and **sounds** for every event
 - **Webhooks and scripts** for anything else
 - **Live monitor**: a picture of every kill, also in a window of its own for a second screen
 - **Auto-update**, German and English, light and dark
@@ -137,6 +138,12 @@ MatchPulse controls OBS directly over **OBS WebSocket** (built into OBS 28 and l
 | Start / stop stream | |
 
 Every rule can wait a few seconds first — for example, save the replay buffer 3 s after a kill, so the moment after it is in the clip. Placeholders: `{kills}`, `{match}`, `{n}`, `{result}`, `{date}`, `{time}`.
+
+## WLED and sound
+
+**WLED** — enter the address of your WLED controller under **Plugins → WLED** and add rules: *flash* a colour (solid, blink or strobe) for a moment, *load a preset*, *set a colour*, or turn the lights *on* or *off*. After a flash MatchPulse puts the lights back the way they were; several kills in a row restore the state from before the first.
+
+**Sound** — under **Plugins → Sound**, pick a built-in sound (ding, double ding, low tone, fanfare) or your own WAV or MP3 file for any event, with its own volume. Sounds play on the Windows default output device without holding anything up; ▶ next to each rule plays it as a test.
 
 ## More
 

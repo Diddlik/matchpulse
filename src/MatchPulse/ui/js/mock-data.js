@@ -39,12 +39,12 @@
         rules: [] },
       { id: 'homeassistant', enabled: true, status: 'connected', lastError: null,
         config: { discoveryPrefix: 'homeassistant', topicPrefix: 'matchpulse', mqttEnabled: true }, rules: [] },
-      { id: 'audio', enabled: false, status: 'ready',
-        config: { apps: [{ name: 'Spotify.exe', volume: 20 }, { name: 'chrome.exe', volume: 40 }], restoreOnExit: true },
-        rules: [
-          { id: 'r4', event: 'match_started', action: 'duck', param: '' },
-          { id: 'r5', event: 'match_ended', action: 'restore', param: '' }
-        ] }
+      { id: 'wled', enabled: true, status: 'connected', lastError: null, config: { host: '192.168.1.50' },
+        rules: [ { id: 'w1', event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 },
+                 { id: 'w2', event: 'match_ended', action: 'preset', color: '#FF0000', effect: 'solid', durationSeconds: 1.5, preset: 3 } ] },
+      { id: 'sound', enabled: true, status: 'ready', lastError: null, config: {},
+        rules: [ { id: 's1', event: 'kill', sound: 'ding', volume: 70 }, { id: 's2', event: 'death', sound: 'low', volume: 60 } ] }
+
     ],
     settings: {
       gameLanguage: 'de', uiLanguage: 'de', theme: 'system', killMarkerColor: '#FF3030',
