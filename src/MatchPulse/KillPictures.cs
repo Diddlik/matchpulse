@@ -48,7 +48,7 @@ public sealed class KillPictures(string folder, ILogger log)
     }
 
     public static string FileName(GameEvent kill, DateTimeOffset at) =>
-        $"{at.ToString(TimeFormat, CultureInfo.InvariantCulture)}_{kill.MatchId ?? "none"}_{kill.Sequence}.jpg";
+        $"{at.ToLocalTime().ToString(TimeFormat, CultureInfo.InvariantCulture)}_{kill.MatchId ?? "none"}_{kill.Sequence}.jpg";
 
     /// <summary>Reads a file name written by <see cref="FileName"/>: capture time, matchId (null outside a Match) and sequence.</summary>
     public static (DateTimeOffset At, string? MatchId, int Sequence)? Parse(string fileName)

@@ -45,7 +45,7 @@ public sealed class DiagnosticSnapshots(string folder, ILogger log) : IDisposabl
                 Cv2.PutText(cell, $"{(t - at).TotalSeconds:+0.0;-0.0;0.0} s", new Point(8, 28), HersheyFonts.HersheySimplex, 0.8, Scalar.Yellow, 2);
             }
             Directory.CreateDirectory(folder);
-            var path = Path.Combine(folder, $"{at:yyyy-MM-dd_HH-mm-ss.fff}_{what}.jpg");
+            var path = Path.Combine(folder, $"{at.ToLocalTime():yyyy-MM-dd_HH-mm-ss.fff}_{what}.jpg");
             Cv2.ImWrite(path, sheet, new ImageEncodingParam(ImwriteFlags.JpegQuality, 85));
             log.LogInformation("Diagnostic snapshot {Path}", path);
         }
