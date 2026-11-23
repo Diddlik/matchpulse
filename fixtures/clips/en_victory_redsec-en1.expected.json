@@ -18,7 +18,8 @@
       "offset": 5.4,
       "data": {
         "result": "victory",
-        "reason": "end_screen"
+        "reason": "end_screen",
+        "kills": "0"
       }
     }
   ],

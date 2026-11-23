@@ -17,6 +17,13 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// It also matches the REDSEC Knockdown Badge, so it is used only while no Match runs.</summary>
     public static readonly Cue KillBadgePlain = new("kill_badge_plain", "kill_badge_plain.png", new Rect2d(0.30, 0.62, 0.20, 0.06), 0.8, 2);
 
+    /// <summary>Knockdown Badge (skull with a down arrow) in the Score Popup, REDSEC. The Kill Badge scores at most ~0.75 against it;
+    /// in multiplayer the plain kill skull scores ~0.87, so it is used only inside a Match.</summary>
+    public static readonly Cue KnockdownBadge = new("knockdown_badge", "knockdown_badge.png", new Rect2d(0.30, 0.62, 0.20, 0.06), 0.8, 2);
+
+    /// <summary>"BEOBACHTE" label while the Player spectates after being eliminated (REDSEC). A text Cue: one template per game language.</summary>
+    public static readonly Cue Spectating = new("spectating", "spectate_label.png", new Rect2d(0.414, 0.722, 0.172, 0.083), 0.7, 3);
+
     /// <summary>X around the crosshair (red by default, colour set in the game), matched as a colour mask at 4 scales.
     /// Shown on knockdowns too, so it only gates the Kill Badge. Kill Markers score 0.43-0.71 on the fixtures, other frames at most 0.30.</summary>
     public static readonly Cue KillMarker = new("kill_marker", "kill_marker_mask.png", new Rect2d(0.4531, 0.4167, 0.0938, 0.1667), 0.37, 1);
@@ -43,6 +50,13 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
         using var template = Cv2.ImRead(File.Exists(path) ? path : Path.Combine(cues, Template), ImreadModes.Grayscale);
         var scale = (double)frame.Height / ReferenceHeight;
         return template.Resize(new Size(Math.Round(template.Width * scale), Math.Round(template.Height * scale)), 0, 0, InterpolationFlags.Area);
+    }
+
+    /// <summary>True when a template exists for <paramref name="language"/> (or a language-neutral one).</summary>
+    public bool HasTemplate(string language)
+    {
+        var cues = Path.Combine(AppContext.BaseDirectory, "cues");
+        return File.Exists(Path.Combine(cues, language, Template)) || File.Exists(Path.Combine(cues, Template));
     }
 
     public Mat Crop(Mat frame) => new(frame, Region(frame.Size()));

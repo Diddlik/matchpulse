@@ -85,7 +85,8 @@
     `<button type="button" ${role === 'radio' ? `role="radio" aria-checked="${id === cur}"` : `aria-pressed="${id === cur}"`} data-act="${act}" data-arg="${id}">${esc(label)}</button>`).join('')}</div>`;
   const evLabel = (e) => t('ev_' + e.type);
   const evDetail = (e) => {
-    if (e.type === 'kill') return e.matchId ? t('kill_n', { n: e.sequence - 1 }) : t('mp_kill');
+    if (e.type === 'kill') return e.matchId ? t('kill_n', { n: (e.data && e.data.kills) || e.sequence - 1 }) : t('mp_kill');
+    if (e.type === 'knockdown' || e.type === 'death') return t('round', { id: (e.matchId || '').slice(0, 8) });
     if (e.type === 'match_ended') return t(e.data.result || 'unknown') + ' · ' + t('reason_' + e.data.reason);
     return t('round', { id: (e.matchId || '').slice(0, 8) });
   };
@@ -325,7 +326,7 @@
             ${p.rules.map((r) => `
               <div class="rule">
                 <span class="small muted" style="width:40px">${esc(t('pl_when'))}</span>
-                <select class="select" aria-label="${esc(t('pl_event'))}" data-change="ruleEvent" data-id="${esc(r.id)}">${['match_started', 'kill', 'match_ended'].map((e) => `<option value="${e}" ${r.event === e ? 'selected' : ''}>${esc(t('ev_' + e))}</option>`).join('')}</select>
+                <select class="select" aria-label="${esc(t('pl_event'))}" data-change="ruleEvent" data-id="${esc(r.id)}">${['match_started', 'kill', 'knockdown', 'death', 'match_ended'].map((e) => `<option value="${e}" ${r.event === e ? 'selected' : ''}>${esc(t('ev_' + e))}</option>`).join('')}</select>
                 <span class="small muted">→</span>
                 <select class="select" aria-label="${esc(t('pl_action'))}" data-change="ruleAction" data-id="${esc(r.id)}">${actions.map((a) => `<option value="${a}" ${r.action === a ? 'selected' : ''}>${esc(t('a_' + a))}</option>`).join('')}</select>
                 ${paramPh[r.action] ? `<input class="input" type="text" style="flex:1 1 140px" placeholder="${esc(t(paramPh[r.action]))}" aria-label="${esc(t(paramPh[r.action]))}" value="${esc(r.param)}" data-change="ruleParam" data-id="${esc(r.id)}">` : ''}

@@ -14,10 +14,17 @@
       "data": {}
     },
     {
+      "type": "knockdown",
+      "offset": 1.2,
+      "data": {}
+    },
+    {
       "type": "kill",
       "offset": 2.0,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
-  "notes": "Player knocks an opponent (Kill Marker at 1.2 s, Kill Feed entry with knockdown chevron) and finishes him about 0.8 s later (weaker Kill Marker ~2.0 s, counter 1->2). Two Kill Marker appearances, one Kill: the knockdown must not produce a kill."
+  "notes": "Player knocks an opponent (Kill Marker at 1.2 s, Kill Feed entry with knockdown chevron) and finishes him about 0.8 s later (weaker Kill Marker ~2.0 s, counter 1->2). Two Kill Marker appearances, one Kill: the knockdown must not produce a kill. Knockdown (ticket 19): the knockdown Kill Marker is red for a single video frame (1.23 s), so 10 checks per second miss it and the knockdown is not reported: a known miss."
 }

@@ -27,9 +27,38 @@ public class KillDetectionTests
     }
 
     [Fact]
-    public void Knockdown_Badge_yields_no_kill()
+    public void Knockdown_Badge_after_a_Kill_Marker_yields_a_knockdown_and_no_kill()
     {
-        Assert.Empty(Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(5)));
+        var events = Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(5));
+
+        var knockdown = Assert.Single(events);
+        Assert.Equal(("knockdown", Start.AddMilliseconds(500)), (knockdown.Type, knockdown.OccurredAt));
+    }
+
+    [Fact]
+    public void Knockdown_Badge_without_a_Kill_Marker_yields_nothing()
+    {
+        Assert.Empty(Run(Blank(3), WithBadges(20, "knockdown_badge"), Blank(5)));
+    }
+
+    [Fact]
+    public void Knockdown_Badge_queued_before_the_Kill_Badge_of_the_same_Kill_Marker_is_no_knockdown()
+    {
+        // Under a Jammer the Score Popup showed the Knockdown Badge first and the Kill Badge later, after one Kill Marker.
+        var events = Run(KillMarker(2), WithBadges(6, "knockdown_badge"), WithBadges(20, "knockdown_badge", "kill_badge"));
+
+        Assert.Equal(["kill"], events.Select(e => e.Type));
+    }
+
+    [Fact]
+    public void Knockdown_then_finishing_the_opponent_yields_knockdown_then_kill()
+    {
+        var events = Run(KillMarker(2), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"), Blank(20));
+
+        Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
+        Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(1200)], events.Select(e => e.OccurredAt));
+        Assert.Equal([2, 3], events.Select(e => e.Sequence));
+        Assert.Equal("1", events[1].Data["kills"]);
     }
 
     [Fact]
@@ -50,7 +79,7 @@ public class KillDetectionTests
     {
         var events = Run(KillMarker(2), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"));
 
-        Assert.Equal(Start.AddMilliseconds(1200), Assert.Single(events).OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(1200), Assert.Single(events, e => e.Type == "kill").OccurredAt);
     }
 
     [Fact]
@@ -114,7 +143,7 @@ public class KillDetectionTests
         // The knockdown's Kill Marker is still unused when the flash for the Kill Badge kill arrives.
         var events = Run(KillMarker(2), WithBadges(3, "knockdown_badge"), KillMarker(2), WithBadges(3, "knockdown_badge", "kill_badge"), KillCounterFlash(6), Blank(20));
 
-        Assert.Equal(Start.AddMilliseconds(700), Assert.Single(events).OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(700), Assert.Single(events, e => e.Type == "kill").OccurredAt);
     }
 
     [Fact]

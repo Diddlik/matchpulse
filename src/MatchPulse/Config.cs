@@ -83,7 +83,7 @@ public sealed record Config(
 /// The password is stored as typed, like OBS stores it in its own settings.</summary>
 public sealed record ObsSettings(bool Enabled = false, string Host = "localhost", int Port = 4455, string Password = "", IReadOnlyList<ObsRule>? Rules = null)
 {
-    public static readonly string[] Events = ["match_started", "kill", "match_ended"];
+    public static readonly string[] Events = ["match_started", "kill", "knockdown", "death", "match_ended"];
     public static readonly string[] Actions =
     [
         "start_recording", "stop_recording", "pause_recording", "resume_recording", "split_recording", "record_chapter",

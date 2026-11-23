@@ -122,23 +122,18 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
 /// <summary>Placeholders in OBS texts, chapter names and replay file names.</summary>
 public static class ObsTemplate
 {
-    /// <summary>{kills} kills so far in the Match (outside a Match: since the last one), {n} the event's sequence,
+    /// <summary>{kills} the Player's kills so far in the Match (outside a Match: since the last one; from <c>data.kills</c> of
+    /// kill and match_ended, 0 otherwise), {n} the event's sequence,
     /// {match} the first 8 characters of the matchId (or "mp"), {result} of a match_ended, {date} and {time} of the event.</summary>
     public static string Fill(string template, GameEvent e) => template
-        .Replace("{kills}", Kills(e).ToString(CultureInfo.InvariantCulture))
+        .Replace("{kills}", Kills(e))
         .Replace("{n}", e.Sequence.ToString(CultureInfo.InvariantCulture))
         .Replace("{match}", e.MatchId is { } id ? id[..Math.Min(8, id.Length)] : "mp")
         .Replace("{result}", e.Data.GetValueOrDefault("result", ""))
         .Replace("{date}", e.OccurredAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
         .Replace("{time}", e.OccurredAt.ToString("HH-mm-ss", CultureInfo.InvariantCulture));
 
-    // In a Match, match_started is sequence 1 and every later event but match_ended is a kill.
-    static int Kills(GameEvent e) => e.MatchId is null ? e.Sequence : e.Type switch
-    {
-        "match_started" => 0,
-        "match_ended" => e.Sequence - 2,
-        _ => e.Sequence - 1,
-    };
+    static string Kills(GameEvent e) => e.Data.GetValueOrDefault("kills", "0");
 }
 
 public sealed class ObsException(string message) : Exception(message);

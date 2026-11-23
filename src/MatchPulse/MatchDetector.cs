@@ -7,7 +7,8 @@ namespace MatchPulse;
 /// <summary>
 /// Takes timestamped frames and emits Game Events. No I/O; time comes from the frames only.
 /// A Match starts when the in-match HUD is confirmed and ends on an end-of-match screen, or when the
-/// in-match HUD has been absent for <c>hudLostAfter</c>. Kills are reported everywhere; outside a Match
+/// in-match HUD has been absent for <c>hudLostAfter</c>. Inside a Match it also reports the Player's knockdowns and
+/// death (spectating). Kills are reported everywhere; outside a Match
 /// (multiplayer) they carry no matchId and are found by the plain Kill Badge.
 /// </summary>
 public sealed class MatchDetector
@@ -16,8 +17,8 @@ public sealed class MatchDetector
     readonly string _gameLanguage;
     readonly bool _useKillCounterFlash;
     Size _frameSize;
-    Mat _killBadge = null!, _killBadgePlain = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
-    Mat? _killCounter;
+    Mat _killBadge = null!, _killBadgePlain = null!, _knockdownBadge = null!, _inMatchHud = null!, _endVictory = null!, _endDefeat = null!;
+    Mat? _killCounter, _spectate;
     Mat[] _killMarker = [];
     readonly TimeSpan _hudLostAfter;
 
@@ -37,9 +38,18 @@ public sealed class MatchDetector
     // Kill Badges currently confirmed in the Score Popup, and the runs of checks showing more or fewer than that.
     // Fewer must persist longer, so a badge missed on a bright background for a check or two is not counted again.
     const int KillBadgeReleaseChecks = 5;
-    int _killBadges;
-    readonly List<(DateTimeOffset At, int Count)> _rise = [];
-    readonly List<int> _fall = [];
+    readonly BadgeTally _killBadges = new(Cue.KillBadge.K), _knockdownBadges = new(Cue.KnockdownBadge.K);
+    int _kills; // the Player's kills in this Match (outside a Match: since the last one), sent as data.kills
+
+    // A Knockdown Badge after a Kill Marker is held until that marker's window closes: when a Kill Badge takes the
+    // same marker, the Score Popup only queued it behind the Kill Badge's credit (seen under a Jammer), so no knockdown.
+    (DateTimeOffset At, DateTimeOffset KillMarker)? _pendingKnockdown;
+
+    // Death: the spectate label, once per elimination; it may flicker while the camera changes Squad members.
+    static readonly TimeSpan DeathRearm = TimeSpan.FromSeconds(5);
+    readonly Hysteresis _spectating = new(Cue.Spectating.K);
+    bool _dead;
+    DateTimeOffset _spectateSeenAt;
 
     // A Kill Badge is a Kill only shortly after a Kill Marker, and each Kill Marker confirms at most one kill:
     // the Squad finishing the Player's knockdown, or a squad wipe killing it, adds a Kill Badge without one.
@@ -96,7 +106,42 @@ public sealed class MatchDetector
             return ended;
 
         Kills(frame, events);
+        if (_matchId is not null)
+        {
+            Knockdowns(frame, events);
+            Death(frame, events);
+        }
         return events;
+    }
+
+    void Knockdowns(Frame frame, List<GameEvent> events)
+    {
+        if (_knockdownBadges.Update(CountBadges(frame.Image, Cue.KnockdownBadge, _knockdownBadge), frame.Timestamp) is { } knock)
+        {
+            _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KnockdownBadge.Name, knock.Count, knock.At);
+            var marker = _killMarkers.FindLastIndex(m => knock.At - m <= KillMarkerWindow && m != _pendingKnockdown?.KillMarker && m != _pendingFlash?.KillMarker);
+            if (marker >= 0)
+            {
+                if (_pendingKnockdown is { } older) events.Add(EmitKnockdown(older));
+                _pendingKnockdown = (knock.At, _killMarkers[marker]);
+            }
+        }
+        if (_pendingKnockdown is { } pending && frame.Timestamp > pending.KillMarker + KillMarkerWindow)
+            events.Add(EmitKnockdown(pending));
+    }
+
+    void Death(Frame frame, List<GameEvent> events)
+    {
+        if (_spectate is null) return; // no spectate label for this game language
+        var seen = GrayScore(frame.Image, Cue.Spectating, _spectate) >= Cue.Spectating.Threshold;
+        if (seen) _spectateSeenAt = frame.Timestamp;
+        if (_spectating.Update(seen, frame.Timestamp) is { } diedAt && !_dead)
+        {
+            _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.Spectating.Name, diedAt);
+            _dead = true;
+            events.Add(Emit("death", diedAt));
+        }
+        if (_dead && !seen && frame.Timestamp - _spectateSeenAt > DeathRearm) _dead = false;
     }
 
     List<GameEvent>? EndOfMatch(Frame frame, bool hud)
@@ -128,44 +173,26 @@ public sealed class MatchDetector
         }
         _killMarkerVisible = killMarker;
 
-        var count = CountKillBadges(frame.Image);
-
-        if (count > _killBadges)
+        var badge = _matchId is null ? Cue.KillBadgePlain : Cue.KillBadge;
+        if (_killBadges.Update(CountBadges(frame.Image, badge, _matchId is null ? _killBadgePlain : _killBadge), frame.Timestamp) is { } rise)
         {
-            _fall.Clear();
-            _rise.Add((frame.Timestamp, count));
-            if (_rise.Count >= Cue.KillBadge.K)
+            var at = rise.At;
+            _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", badge.Name, rise.Count, at);
+            var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
+            if (marker >= 0 || _killMarkerBands is null)
             {
-                var confirmed = _rise.Min(r => r.Count);
-                var at = _rise[0].At;
-                _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", (_matchId is null ? Cue.KillBadgePlain : Cue.KillBadge).Name, confirmed, at);
-                var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
-                if (marker >= 0 || _killMarkerBands is null)
+                DateTimeOffset? markerAt = marker >= 0 ? _killMarkers[marker] : null;
+                if (_pendingKnockdown is { } knock)
                 {
-                    events.Add(Emit("kill", at));
-                    if (marker >= 0) _killMarkers.RemoveAt(marker);
-                    _pendingFlash = null;
-                    _badgeKillAt = at;
+                    if (knock.KillMarker == markerAt) _pendingKnockdown = null; // queued credit, not a knockdown of its own
+                    else events.Add(EmitKnockdown(knock)); // an earlier knockdown of the opponent now finished
                 }
-                else Unconfirmed?.Invoke("kill_badge_without_kill_marker", at);
-                _killBadges = confirmed;
-                _rise.Clear();
+                events.Add(EmitKill(at));
+                if (markerAt is { } used) _killMarkers.Remove(used);
+                _pendingFlash = null;
+                _badgeKillAt = at;
             }
-        }
-        else
-        {
-            _rise.Clear();
-            if (count == _killBadges)
-                _fall.Clear();
-            else
-            {
-                _fall.Add(count);
-                if (_fall.Count >= KillBadgeReleaseChecks)
-                {
-                    _killBadges = _fall.Max();
-                    _fall.Clear();
-                }
-            }
+            else Unconfirmed?.Invoke("kill_badge_without_kill_marker", at);
         }
 
         if (_flash.Update(KillCounterFlashes(frame.Image), frame.Timestamp) is { } flashAt)
@@ -179,7 +206,7 @@ public sealed class MatchDetector
         if (_pendingFlash is { } flash && frame.Timestamp > flash.KillMarker + KillMarkerWindow)
             events.Add(EmitPendingFlash(flash));
 
-        foreach (var expired in _killMarkers.Where(m => frame.Timestamp - m > KillMarkerWindow && _pendingFlash?.KillMarker != m).ToList())
+        foreach (var expired in _killMarkers.Where(m => frame.Timestamp - m > KillMarkerWindow && _pendingFlash?.KillMarker != m && _pendingKnockdown?.KillMarker != m).ToList())
         {
             _killMarkers.Remove(expired);
             Unconfirmed?.Invoke("kill_marker_without_kill_badge", expired);
@@ -206,9 +233,12 @@ public sealed class MatchDetector
     void ResetKills()
     {
         _sequence = 0;
-        _killBadges = 0;
-        _rise.Clear();
-        _fall.Clear();
+        _kills = 0;
+        _killBadges.Reset();
+        _knockdownBadges.Reset();
+        _pendingKnockdown = null;
+        _spectating.Reset();
+        _dead = false;
         _killMarkerVisible = false;
         _killMarkers.Clear();
         _flash.Reset();
@@ -216,11 +246,13 @@ public sealed class MatchDetector
         _badgeKillAt = null;
     }
 
-    // A held kill counter flash belongs to the Match that ends, so it is sent before match_ended.
+    // A held knockdown or kill counter flash belongs to the Match that ends, so it is sent before match_ended.
     List<GameEvent> EndMatch(DateTimeOffset at, string result, string reason)
     {
-        List<GameEvent> events = _pendingFlash is { } flash ? [EmitPendingFlash(flash)] : [];
-        events.Add(Emit("match_ended", at, new() { ["result"] = result, ["reason"] = reason }));
+        List<GameEvent> events = [];
+        if (_pendingKnockdown is { } knock) events.Add(EmitKnockdown(knock));
+        if (_pendingFlash is { } flash) events.Add(EmitPendingFlash(flash));
+        events.Add(Emit("match_ended", at, new() { ["result"] = result, ["reason"] = reason, ["kills"] = Count(_kills) }));
         _matchId = null;
         _hud.Reset();
         ResetKills();
@@ -231,8 +263,20 @@ public sealed class MatchDetector
     {
         _pendingFlash = null;
         _killMarkers.Remove(flash.KillMarker);
-        return Emit("kill", flash.At);
+        return EmitKill(flash.At);
     }
+
+    GameEvent EmitKill(DateTimeOffset at) => Emit("kill", at, new() { ["kills"] = Count(++_kills) });
+
+    GameEvent EmitKnockdown((DateTimeOffset At, DateTimeOffset KillMarker) knock)
+    {
+        _pendingKnockdown = null;
+        _killMarkers.Remove(knock.KillMarker);
+        _log.LogInformation("Knockdown at {At:O}", knock.At);
+        return Emit("knockdown", knock.At);
+    }
+
+    static string Count(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     // Templates are scaled to the frame size, so they are (re)loaded when it changes.
     void LoadTemplates(Size frame)
@@ -240,6 +284,8 @@ public sealed class MatchDetector
         _frameSize = frame;
         _killBadge = Cue.KillBadge.LoadTemplate(frame, _gameLanguage);
         _killBadgePlain = Cue.KillBadgePlain.LoadTemplate(frame, _gameLanguage);
+        _knockdownBadge = Cue.KnockdownBadge.LoadTemplate(frame, _gameLanguage);
+        _spectate = Cue.Spectating.HasTemplate(_gameLanguage) ? Cue.Spectating.LoadTemplate(frame, _gameLanguage) : null;
         using var killMarker = Cue.KillMarker.LoadTemplate(frame, _gameLanguage);
         foreach (var scaled in _killMarker) scaled.Dispose();
         _killMarker = KillMarkerScales.Select(s => killMarker.Resize(new Size(Math.Round(killMarker.Width * s), Math.Round(killMarker.Height * s)), 0, 0, InterpolationFlags.Area)).ToArray();
@@ -315,11 +361,10 @@ public sealed class MatchDetector
         return green.CountNonZero() > 0.5 * bright.CountNonZero();
     }
 
-    int CountKillBadges(Mat image)
+    static int CountBadges(Mat image, Cue cue, Mat badge)
     {
-        using var region = Cue.KillBadge.Crop(image);
+        using var region = cue.Crop(image);
         using var gray = region.CvtColor(ColorConversionCodes.BGR2GRAY);
-        var badge = _matchId is null ? _killBadgePlain : _killBadge;
         using var scores = gray.MatchTemplate(badge, TemplateMatchModes.CCoeffNormed);
 
         // Count every match above the threshold, blanking each one's neighbourhood so it is counted once.
@@ -327,9 +372,52 @@ public sealed class MatchDetector
         while (true)
         {
             scores.MinMaxLoc(out _, out double max, out _, out Point at);
-            if (max < Cue.KillBadge.Threshold) return count;
+            if (max < cue.Threshold) return count;
             count++;
             scores.Rectangle(new Rect(at.X - badge.Width, at.Y - badge.Height, 2 * badge.Width, 2 * badge.Height), Scalar.All(-1), -1);
+        }
+    }
+
+    /// <summary>Badges of one kind confirmed in the Score Popup. More must show for K checks; fewer must persist
+    /// <see cref="KillBadgeReleaseChecks"/> checks, so a badge missed on a bright background is not counted again.</summary>
+    sealed class BadgeTally(int k)
+    {
+        int _count;
+        readonly List<(DateTimeOffset At, int Count)> _rise = [];
+        readonly List<int> _fall = [];
+
+        /// <summary>The time of the first check of a confirmed rise and the new count, once.</summary>
+        public (DateTimeOffset At, int Count)? Update(int count, DateTimeOffset at)
+        {
+            if (count > _count)
+            {
+                _fall.Clear();
+                _rise.Add((at, count));
+                if (_rise.Count < k) return null;
+                var confirmed = (_rise[0].At, _rise.Min(r => r.Count));
+                _count = confirmed.Item2;
+                _rise.Clear();
+                return confirmed;
+            }
+            _rise.Clear();
+            if (count == _count) _fall.Clear();
+            else
+            {
+                _fall.Add(count);
+                if (_fall.Count >= KillBadgeReleaseChecks)
+                {
+                    _count = _fall.Max();
+                    _fall.Clear();
+                }
+            }
+            return null;
+        }
+
+        public void Reset()
+        {
+            _count = 0;
+            _rise.Clear();
+            _fall.Clear();
         }
     }
 

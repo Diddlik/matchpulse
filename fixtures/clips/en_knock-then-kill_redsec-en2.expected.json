@@ -16,7 +16,9 @@
     {
       "type": "kill",
       "offset": 3.0,
-      "data": {}
+      "data": {
+        "kills": "1"
+      }
     }
   ],
   "notes": "English, 1920x1080. The clip starts mid-Match; the in-match HUD flickers below 0.7 in the first checks (0.1, 0.3-0.5, 0.7 s), so match_started is confirmed at 0.8 s. Knockdown Badge in the Score Popup from 1.4 s (scores 0.92-0.97 scaled to 1080p). The Player then finishes the opponent through iron sights: Kill Marker 3.0-3.4 s, about a third of the hip-fire size and dim (HSV V 74-141); the red mask with V > 120 at scale 0.35 scores 0.44-0.46 at 3.2-3.3 s. Kill Badge from 3.6 s (0.89-0.94)."

@@ -16,7 +16,8 @@ public sealed class ObsSinkTests : IDisposable
 
     ObsSettings Settings(string password = "secret", params ObsRule[] rules) => new(true, "localhost", _obs.Port, password, rules);
 
-    static GameEvent Event(string type, int sequence = 1) => new(type, "m1", sequence, Start, new Dictionary<string, string>());
+    static GameEvent Event(string type, int sequence = 1) =>
+        new(type, "m1", sequence, Start, type == "kill" ? new Dictionary<string, string> { ["kills"] = (sequence - 1).ToString() } : new Dictionary<string, string>());
 
     static async Task Until(Func<bool> condition)
     {
@@ -27,9 +28,9 @@ public sealed class ObsSinkTests : IDisposable
     [Fact]
     public void Placeholders_are_filled_from_the_Game_Event()
     {
-        var kill = new GameEvent("kill", "91fdb6ce4f2a", 4, Start, new Dictionary<string, string>());
-        var mpKill = new GameEvent("kill", null, 2, Start, new Dictionary<string, string>());
-        var ended = new GameEvent("match_ended", "91fdb6ce4f2a", 5, Start, new Dictionary<string, string> { ["result"] = "victory" });
+        var kill = new GameEvent("kill", "91fdb6ce4f2a", 4, Start, new Dictionary<string, string> { ["kills"] = "3" });
+        var mpKill = new GameEvent("kill", null, 2, Start, new Dictionary<string, string> { ["kills"] = "2" });
+        var ended = new GameEvent("match_ended", "91fdb6ce4f2a", 5, Start, new Dictionary<string, string> { ["result"] = "victory", ["kills"] = "3" });
 
         Assert.Equal("2026-11-23_91fdb6ce_Kill-3_20-00-00", ObsTemplate.Fill("{date}_{match}_Kill-{kills}_{time}", kill));
         Assert.Equal("mp 2 kills", ObsTemplate.Fill("{match} {kills} kills", mpKill));

@@ -1,8 +1,20 @@
 {
   "clip": "mp_kill_conquest-1123b.mkv",
-  "source": { "recording": "live capture 2026-11-23, Conquest (multiplayer), 15 fps", "start": 545.5, "duration": 6 },
+  "source": {
+    "recording": "live capture 2026-11-23, Conquest (multiplayer), 15 fps",
+    "start": 545.5,
+    "duration": 6
+  },
   "encoding": "re-encoded: libx264 CRF 26, 15 fps, 2560x1440, yuv420p, no audio",
   "gameLanguage": "de",
-  "events": [{ "type": "kill", "offset": 2.0, "data": {} }],
+  "events": [
+    {
+      "type": "kill",
+      "offset": 2.0,
+      "data": {
+        "kills": "1"
+      }
+    }
+  ],
   "notes": "Multiplayer kill: Kill Marker at 2.0 s, plain skull with 100 from 2.4 s."
 }
