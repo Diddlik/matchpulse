@@ -147,6 +147,7 @@ Every rule can wait a few seconds first — for example, save the replay buffer 
 
 ## More
 
+- **On/off with a hotkey** — **Ctrl+Alt+M** (changeable in Settings) pauses MatchPulse and turns it back on from anywhere, also in the game; a short notice shows above all windows. The same switch is in Settings and the tray menu. Paused means no capture and no events.
 - **Live monitor** — with it turned on, MatchPulse saves a picture of the screen at every kill and shows it at once, also in a window of its own that never takes the focus from the game.
 - **Diagnostic mode** — when a kill seems missing, MatchPulse saves a picture of every unclear moment (a skull without an X, an X without a skull) with the kill feed, so the cause can be found.
 - **Updates** — MatchPulse checks the releases at start and once a day, verifies the download's SHA-256 and installs it silently, never while the game runs. Both can be turned off.

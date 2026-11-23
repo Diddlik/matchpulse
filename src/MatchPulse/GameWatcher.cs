@@ -45,14 +45,33 @@ public static class GameWatcher
                 log.LogInformation("Diagnostic mode: snapshots go to {Folder}", diagnosticsFolder);
             }
             var pictures = new KillPictures(KillPictures.DefaultFolder, log);
+            var paused = false;
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
+                // Paused (Config.Active off): no capture and no Game Events; a running Match ends with reason "stopped".
+                if (!config().Active)
+                {
+                    if (!paused)
+                    {
+                        paused = true;
+                        log.LogInformation("MatchPulse paused: capture stopped");
+                        foreach (var gameEvent in detector.Stopped(DateTimeOffset.Now)) dispatch(gameEvent);
+                    }
+                    stop.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+                    continue;
+                }
+                if (paused)
+                {
+                    paused = false;
+                    log.LogInformation("MatchPulse active again: capture resumed");
+                }
                 try
                 {
                     var nextCheck = DateTimeOffset.MinValue;
                     foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, snapshots is null ? null : DiagnosticSnapshots.Regions, () => pictures.Wanted))
                         using (frame.Image)
                         {
+                            if (!config().Active) break;
                             if (pictures.Save(frame) is { } saved) killPicture?.Invoke(saved.Kill, saved.Path);
                             snapshots?.Add(frame);
                             foreach (var gameEvent in detector.Process(frame))

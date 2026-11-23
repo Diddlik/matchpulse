@@ -130,6 +130,11 @@
     const okSinks = S.sinks.filter((k) => !k.lastError).length;
     return `
       <h1>${esc(t('nav_status'))}</h1>
+      ${S.settings && S.settings.active === false ? `
+      <section class="notice warn row-flex" style="padding:14px 18px">${WARN_ICON}
+        <span style="flex:1 1 300px"><strong>${esc(t('paused'))}</strong> <span class="muted small">${esc(t('paused_d', { k: S.settings.toggleHotkey || '–' }))}</span></span>
+        <button type="button" class="btn s primary" data-act="setActive" data-arg="1">${esc(t('activate'))}</button>
+      </section>` : ''}
       ${upNotice}
       <section class="card s-${st}" style="flex-direction:row;flex-wrap:wrap;gap:24px;align-items:center;padding:24px">
         <div class="stack-s" style="flex:1 1 320px">
@@ -423,6 +428,9 @@
       <div class="narrow stack">
         <h1>${esc(t('nav_setup'))}</h1>
         <section class="card flush settings-group"><h2>${esc(t('sec_general'))}</h2>
+          <div class="setting"><div class="text"><label for="act">${esc(t('active'))}</label><span class="desc">${esc(t('active_d'))}</span></div><input id="act" class="check" type="checkbox" ${S.settings.active !== false ? 'checked' : ''} data-change="activeNow"></div>
+          <div class="setting"><div class="text"><label for="hk">${esc(t('hotkey'))}</label><span class="desc">${esc(t('hotkey_d'))}</span></div>
+            <input id="hk" class="input mono" type="text" readonly style="width:170px;text-align:center;cursor:pointer" value="${esc(d.toggleHotkey || t('hotkey_none'))}" aria-label="${esc(t('hotkey'))}"></div>
           <div class="setting"><div class="text"><label for="gl">${esc(t('game_lang'))}</label><span class="desc">${esc(t('game_lang_d'))}</span></div><span class="next-start">${esc(t('apply_next'))}</span>${sel('gl', 'gameLanguage', langs)}</div>
           <div class="setting"><div class="text"><label for="ul">${esc(t('ui_lang'))}</label><span class="desc">${esc(t('ui_lang_d'))}</span></div>${sel('ul', 'uiLanguage', langs)}</div>
           <div class="setting"><div class="text"><span class="title">${esc(t('theme'))}</span></div>${seg([['system', t('th_system')], ['light', t('th_light')], ['dark', t('th_dark')]], d.theme, 'theme', 'radio')}</div>
@@ -553,6 +561,7 @@
     $('side-status').className = 'side-status s-' + st;
     $('side-status').innerHTML = `<div class="row-flex" style="gap:8px;font-weight:600"><span class="dot" style="width:10px;height:10px"></span>${esc(t('st_' + st))}</div>
       ${S.update ? `<span class="caption muted" style="opacity:.7">MatchPulse ${esc(S.update.current)}</span>` : ''}
+      ${S.settings.active === false ? `<span class="caption" style="color:var(--warn)">${esc(t('paused'))}</span>` : ''}
       <span class="caption muted">${esc(st === 'off' ? t('side_off') : st === 'game' || !S.match ? t('side_game', { r: S.settings.checksPerSecond }) : t('side_match', { t: hhmm(S.match.startedAt), k: roundKills().length }))}</span>`;
     $('toast').innerHTML = S.toast ? `<div class="toast">${OK_ICON}<span>${esc(S.toast)}</span></div>` : '';
     $('main-content').innerHTML = PAGES[S.page]();
@@ -625,6 +634,7 @@
     doClear: () => { S.confirmClear = false; S.diagIdx = 0; B.send('clearDiagnostics'); },
     logFilter: (f) => { S.logFilter = f; },
     checkUpdates: () => B.send('checkUpdates'),
+    setActive: (v) => { S.settings = Object.assign({}, S.settings, { active: v === '1' }); S.draft = Object.assign({}, S.draft, { active: v === '1' }); B.send('setActive', { active: v === '1' }); },
     installUpdate: () => B.send('installUpdate'),
     openReleasePage: () => B.send('openReleasePage'),
     refreshLog: () => { S.log = S.log.concat(S.pending); S.pending = []; }
@@ -636,6 +646,7 @@
     color: (v) => { setDraft('killMarkerColor', v.toUpperCase()); S.hexDraft = v.toUpperCase(); },
     hex: (v) => { S.hexDraft = v; if (/^#[0-9a-f]{6}$/i.test(v)) setDraft('killMarkerColor', v.toUpperCase()); },
     addKind: (v) => { S.addKind = v; S.addError = ''; },
+    activeNow: (v, el) => ACT.setActive(el.checked ? '1' : '0'),
     autoRefresh: (v, el) => { S.autoRefresh = el.checked; if (el.checked) { S.log = S.log.concat(S.pending); S.pending = []; } },
     liveMonitor: (v, el) => { S.settings.liveMonitor = el.checked; S.draft.liveMonitor = el.checked; S.liveIdx = -1; B.send('setLiveMonitor', { enabled: el.checked }); },
     plugEnabled: (v, el) => editPlug((p) => { p.enabled = el.checked; }, el.dataset.id),
@@ -684,7 +695,27 @@
     const el = e.target.closest('[data-input]'); if (!el) return;
     const fn = INP[el.dataset.input]; if (fn) fn(el.value, el);
   });
+  // Hotkey field: the pressed combination becomes the new hotkey (Backspace/Delete clears it).
+  const hotkeyName = (e) => {
+    const c = e.code;
+    if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+    if (/^Digit[0-9]$/.test(c)) return c.slice(5);
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(c)) return c;
+    if (/^Numpad[0-9]$/.test(c)) return 'NumPad' + c.slice(6);
+    return ['Pause', 'Insert', 'Home', 'End', 'PageUp', 'PageDown'].indexOf(c) >= 0 ? c : null;
+  };
   document.addEventListener('keydown', (e) => {
+    if (e.target.id === 'hk') {
+      e.preventDefault();
+      if (e.key === 'Escape' || e.key === 'Tab') return;
+      if (e.key === 'Backspace' || e.key === 'Delete') { setDraft('toggleHotkey', ''); render(); return; }
+      const key = hotkeyName(e);
+      const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Win'].filter(Boolean);
+      if (!key || !mods.length) return;
+      setDraft('toggleHotkey', mods.concat([key]).join('+'));
+      render();
+      return;
+    }
     if (e.key === 'Enter' && e.target.id === 'add-target') { ACT.addSink(); render(); }
     if (e.key === 'Enter' && e.target.id === 'new-app') { ACT.addApp(); render(); }
     if (e.key === 'Enter' && e.target.id && e.target.id.indexOf('edit-') === 0) { ACT.saveEdit(); render(); }
