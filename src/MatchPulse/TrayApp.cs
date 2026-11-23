@@ -23,6 +23,7 @@ sealed class TrayApp : ApplicationContext
     readonly ILogger _log;
     readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
     readonly NotifyIcon _tray = new() { Visible = true };
+    static readonly Icon AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icons[TrayState.MatchRunning];
     readonly SynchronizationContext _ui;
     readonly UiHub _hub;
     readonly CancellationTokenSource _stop = new();
@@ -30,7 +31,7 @@ sealed class TrayApp : ApplicationContext
     MainWindow? _window, _liveWindow;
     string _balloonPage = "status";
 
-    public TrayApp(string configPath, FileLog file, ILogger log, bool showWindow = false)
+    public TrayApp(string configPath, FileLog file, ILogger log, bool showWindow = false, WaitHandle? showRequested = null)
     {
         _configPath = configPath;
         _log = log;
@@ -65,6 +66,8 @@ sealed class TrayApp : ApplicationContext
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
         if (showWindow) ShowWindow();
+        if (showRequested is not null)
+            ThreadPool.RegisterWaitForSingleObject(showRequested, (_, _) => _ui.Post(_ => ShowWindow(), null), null, Timeout.Infinite, executeOnlyOnce: false);
     }
 
     public Config Config { get; private set; }
@@ -97,7 +100,7 @@ sealed class TrayApp : ApplicationContext
             _window.Activate();
             return;
         }
-        _window = new MainWindow(_hub, Icons[TrayState.MatchRunning], page);
+        _window = new MainWindow(_hub, AppIcon, page);
         _window.Show();
     }
 
@@ -105,7 +108,7 @@ sealed class TrayApp : ApplicationContext
     void ShowLiveWindow()
     {
         if (_liveWindow is { IsDisposed: false }) return;
-        _liveWindow = new MainWindow(_hub, Icons[TrayState.MatchRunning], "live", passive: true);
+        _liveWindow = new MainWindow(_hub, AppIcon, "live", passive: true);
         _liveWindow.Show();
     }
 

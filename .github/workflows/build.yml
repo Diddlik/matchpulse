@@ -1,0 +1,52 @@
+name: Build and release
+
+# Every push and pull request: build and test.
+# A tag like v1.2.3: also publish, build the installer and create the GitHub release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Test
+        run: dotnet test MatchPulse.slnx -c Release
+
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: echo "VERSION=$('${{ github.ref_name }}'.TrimStart('v'))" >> $env:GITHUB_ENV
+
+      - name: Publish
+        if: env.VERSION != ''
+        run: dotnet publish src/MatchPulse -c Release -r win-x64 --self-contained -p:Version=${{ env.VERSION }} -o publish
+
+      - name: Installer
+        if: env.VERSION != ''
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          & $iscc /Q /DAppVersion=$env:VERSION /DSourceDir=..\publish installer\MatchPulse.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Compress-Archive publish\* artifacts\MatchPulse-$env:VERSION-portable-win-x64.zip
+
+      - name: Release
+        if: env.VERSION != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
