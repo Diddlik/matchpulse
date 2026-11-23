@@ -7,6 +7,7 @@ namespace MatchPulse;
 /// Local config file, for example
 /// <c>{ "webhooks": ["http://localhost:8080/bf6"], "scripts": ["pwsh -File C:\obs.ps1"], "gameLanguage": "de", "uiLanguage": "en", "checksPerSecond": 10, "hudLostAfterSeconds": 120, "killMarkerColor": "#FF0000" }</c>.
 /// <c>killMarkerColor</c> is the Kill Marker colour set in the game settings, as <c>#RRGGBB</c>.
+/// <c>"diagnostics": true</c> saves a snapshot of every unconfirmed Kill case (see <see cref="DiagnosticSnapshots"/>).
 /// Each script is a command line run through <c>cmd.exe /s /c "command"</c> once per Game Event.
 /// </summary>
 public sealed record Config(
@@ -16,7 +17,8 @@ public sealed record Config(
     string GameLanguage = "de",
     string UiLanguage = "en",
     double HudLostAfterSeconds = 120,
-    string KillMarkerColor = "#FF0000")
+    string KillMarkerColor = "#FF0000",
+    bool Diagnostics = false)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");

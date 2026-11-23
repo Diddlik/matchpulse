@@ -56,6 +56,10 @@ public sealed class MatchDetector
     (DateTimeOffset At, DateTimeOffset KillMarker)? _pendingFlash;
     DateTimeOffset? _badgeKillAt; // a kill counter flash this close to a Kill Badge kill belongs to it
 
+    /// <summary>Diagnostic mode: a case where a Kill may have been missed, with the time of its Cue.
+    /// <c>kill_badge_without_kill_marker</c> when a Kill Badge is not confirmed, <c>kill_marker_without_kill_badge</c> when a Kill Marker's window closes unused.</summary>
+    public event Action<string, DateTimeOffset>? Unconfirmed;
+
     /// <param name="killCounterFlash">Use the REDSEC kill counter flash as a fallback; off where there is no counter bar.</param>
     /// <param name="hudLostAfter">How long the in-match HUD may be absent before the Match ends (default 120 s, longer than a Jammer).</param>
     /// <param name="gameLanguage">Selects the templates of text Cues (<see cref="Config.GameLanguage"/>).</param>
@@ -143,6 +147,7 @@ public sealed class MatchDetector
                     _pendingFlash = null;
                     _badgeKillAt = at;
                 }
+                else Unconfirmed?.Invoke("kill_badge_without_kill_marker", at);
                 _killBadges = confirmed;
                 _rise.Clear();
             }
@@ -173,6 +178,12 @@ public sealed class MatchDetector
 
         if (_pendingFlash is { } flash && frame.Timestamp > flash.KillMarker + KillMarkerWindow)
             events.Add(EmitPendingFlash(flash));
+
+        foreach (var expired in _killMarkers.Where(m => frame.Timestamp - m > KillMarkerWindow && _pendingFlash?.KillMarker != m).ToList())
+        {
+            _killMarkers.Remove(expired);
+            Unconfirmed?.Invoke("kill_marker_without_kill_badge", expired);
+        }
     }
 
     /// <summary>The game closed at <paramref name="at"/>: ends a running Match with <c>result: unknown</c>, <c>reason: game_exited</c>.</summary>

@@ -48,7 +48,9 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     public Mat Crop(Mat frame) => new(frame, Region(frame.Size()));
 
     /// <summary>The search region in pixels of a frame of the given size.</summary>
-    public Rect Region(Size frame) => new(
-        (int)(SearchRegion.X * frame.Width), (int)(SearchRegion.Y * frame.Height),
-        (int)(SearchRegion.Width * frame.Width), (int)(SearchRegion.Height * frame.Height));
+    public Rect Region(Size frame) => Pixels(SearchRegion, frame);
+
+    public static Rect Pixels(Rect2d region, Size frame) => new(
+        (int)(region.X * frame.Width), (int)(region.Y * frame.Height),
+        (int)(region.Width * frame.Width), (int)(region.Height * frame.Height));
 }

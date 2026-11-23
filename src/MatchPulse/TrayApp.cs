@@ -48,7 +48,8 @@ sealed class TrayApp : ApplicationContext
         Status.Changed += _ => _ui.Post(_ => ShowState(), null);
         RefreshTray();
         log.LogInformation("Tray app started, config {Path}", configPath);
-        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, () => Config.KillMarkerColor, TimeSpan.FromSeconds(Config.HudLostAfterSeconds), Dispatcher.Dispatch, log, _stop.Token, Status.SetGameRunning))
+        _watcher = new Thread(() => GameWatcher.Run(Config.ChecksPerSecond, () => Config.GameLanguage, () => Config.KillMarkerColor, TimeSpan.FromSeconds(Config.HudLostAfterSeconds), Dispatcher.Dispatch, log, _stop.Token, Status.SetGameRunning,
+            Config.Diagnostics ? DiagnosticSnapshots.DefaultFolder : null))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
     }
