@@ -30,8 +30,7 @@ public sealed class UiHub : IEventSink
     readonly HashSet<string> _problems = [];
     bool _game;
     JsonObject? _match;
-    string _obsStatus = "disconnected";
-    string? _obsError;
+    readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null) };
 
     sealed record SinkHealth(DateTimeOffset? LastSuccessAt, DateTimeOffset? LastFailureAt, string? Code, string? Message);
 
@@ -121,7 +120,8 @@ public sealed class UiHub : IEventSink
     /// <summary>Records the result of a delivery to an Event Sink (from <see cref="EventDispatcher.Delivered"/>).</summary>
     public void Delivered(IEventSink sink, Exception? error)
     {
-        if (sink is ObsSink) { ObsResult(error); return; }
+        if (sink is ObsSink) { PluginResult("obs", error); return; }
+        if (sink is MqttSink) { PluginResult("mqtt", error); return; }
         if (SinkId(sink) is not { } id) return;
         bool newFailure;
         lock (_lock)
@@ -189,6 +189,8 @@ public sealed class UiHub : IEventSink
                 break;
             case "savePlugin" when (string?)payload!["id"] == "obs": Apply(_config() with { Obs = ObsFrom(payload!.AsObject()) }); break;
             case "testPlugin" when (string?)payload!["id"] == "obs": _ = TestObsAsync(_config().Obs); break;
+            case "savePlugin" when (string?)payload!["id"] == "mqtt": Apply(_config() with { Mqtt = MqttFrom(payload!.AsObject()) }); break;
+            case "testPlugin" when (string?)payload!["id"] == "mqtt": _ = TestMqttAsync(_config().Mqtt); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
             case "checkUpdates" when _updates is not null: _ = _updates.CheckAsync(); break;
@@ -211,7 +213,7 @@ public sealed class UiHub : IEventSink
                 ["hostProblems"] = Problems(),
                 ["events"] = new JsonArray([.. _events.Select(e => e.DeepClone())]),
                 ["sinks"] = Sinks(config),
-                ["plugins"] = new JsonArray(Obs(config.Obs)),
+                ["plugins"] = new JsonArray(Obs(config.Obs), Mqtt(config.Mqtt)),
                 ["settings"] = Settings(config),
                 ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
@@ -263,34 +265,82 @@ public sealed class UiHub : IEventSink
         {
             var version = await ObsSink.TestAsync(settings, CancellationToken.None);
             Logged(DateTimeOffset.Now, LogLevel.Information, $"OBS {version} reached at {settings.Host}:{settings.Port}");
-            ObsResult(null);
+            PluginResult("obs", null);
         }
         catch (Exception e)
         {
             Logged(DateTimeOffset.Now, LogLevel.Warning, $"OBS test at {settings.Host}:{settings.Port} failed: {e.Message}");
-            ObsResult(e);
+            PluginResult("obs", e);
         }
     }
 
-    void ObsResult(Exception? error)
+    async Task TestMqttAsync(MqttSettings settings)
+    {
+        try
+        {
+            await MqttSink.TestAsync(settings, CancellationToken.None);
+            Logged(DateTimeOffset.Now, LogLevel.Information, $"MQTT broker reached at {settings.Host}:{settings.Port}");
+            PluginResult("mqtt", null);
+        }
+        catch (Exception e)
+        {
+            Logged(DateTimeOffset.Now, LogLevel.Warning, $"MQTT test at {settings.Host}:{settings.Port} failed: {e.Message}");
+            PluginResult("mqtt", e);
+        }
+    }
+
+    void PluginResult(string id, Exception? error)
     {
         bool newFailure;
+        (string Status, string? Error) state;
         lock (_lock)
         {
-            newFailure = error is not null && _obsStatus != "error";
-            _obsStatus = error is null ? "connected" : "error";
-            _obsError = error is null ? null : ObsMessage(error);
+            newFailure = error is not null && _plugins[id].Status != "error";
+            state = _plugins[id] = (error is null ? "connected" : "error", error is null ? null : PluginMessage(id, error));
         }
-        Send("pluginStatus", new JsonObject { ["id"] = "obs", ["status"] = _obsStatus, ["lastError"] = _obsError });
-        if (newFailure) Problem?.Invoke("ObsFailed", "plugins");
+        Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error });
+        if (newFailure) Problem?.Invoke(id == "obs" ? "ObsFailed" : "MqttFailed", "plugins");
     }
 
-    static string ObsMessage(Exception e) => e switch
+    static string PluginMessage(string id, Exception e) => e switch
     {
-        ObsException => e.Message,
-        WebSocketException or OperationCanceledException => "OBS is not reachable.",
+        ObsException or MqttRefusedException => e.Message,
+        WebSocketException or OperationCanceledException or System.Net.Sockets.SocketException => id == "obs" ? "OBS is not reachable." : "The MQTT broker is not reachable.",
+        _ when e.InnerException is System.Net.Sockets.SocketException => "The MQTT broker is not reachable.",
         _ => e.Message,
     };
+
+    JsonObject Mqtt(MqttSettings m)
+    {
+        lock (_lock)
+            return new JsonObject
+            {
+                ["id"] = "mqtt",
+                ["enabled"] = m.Enabled,
+                ["status"] = _plugins["mqtt"].Status,
+                ["lastError"] = _plugins["mqtt"].Error,
+                ["config"] = new JsonObject
+                {
+                    ["host"] = m.Host, ["port"] = m.Port, ["useTls"] = m.UseTls, ["username"] = m.Username,
+                    ["password"] = m.Password, ["topicPrefix"] = m.TopicPrefix, ["qos"] = m.Qos,
+                },
+                ["rules"] = new JsonArray(),
+            };
+    }
+
+    public static MqttSettings MqttFrom(JsonObject p)
+    {
+        var c = p["config"]!;
+        return new MqttSettings(
+            (bool?)p["enabled"] ?? false,
+            ((string?)c["host"] ?? "").Trim(),
+            (int?)c["port"] ?? 0,
+            (bool?)c["useTls"] ?? false,
+            ((string?)c["username"] ?? "").Trim(),
+            (string?)c["password"] ?? "",
+            ((string?)c["topicPrefix"] ?? "").Trim(),
+            (int?)c["qos"] ?? 1);
+    }
 
     JsonObject Obs(ObsSettings obs)
     {
@@ -299,8 +349,8 @@ public sealed class UiHub : IEventSink
             {
                 ["id"] = "obs",
                 ["enabled"] = obs.Enabled,
-                ["status"] = _obsStatus,
-                ["lastError"] = _obsError,
+                ["status"] = _plugins["obs"].Status,
+                ["lastError"] = _plugins["obs"].Error,
                 ["config"] = new JsonObject { ["host"] = obs.Host, ["port"] = obs.Port, ["password"] = obs.Password },
                 ["rules"] = new JsonArray([.. obs.Rules.Select(r => (JsonNode)new JsonObject
                 {

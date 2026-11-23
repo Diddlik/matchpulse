@@ -39,7 +39,8 @@
     sinks: 'M4 12h12M12 6l6 6-6 6M21 4v16', plugins: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4',
     setup: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4', diag: 'M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4M9 12h6M12 9v6',
     log: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7M9 8h3', obs: 'M4 7h11v10H4zM15 10.5l5-3v9l-5-3',
-    audio: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11'
+    audio: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11',
+    mqtt: 'M5 19a1 1 0 1 0 0-.01M5 13a6 6 0 0 1 6 6M5 7a12 12 0 0 1 12 12'
   };
   const icon = (name, size) => `<svg width="${size || 18}" height="${size || 18}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const X_ICON = '<svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.4"/></svg>';
@@ -61,6 +62,7 @@
 
   // ---------- Abgeleitete Werte ----------
   const plugStatus = (p) => (!p.enabled ? 'off' : p.status);
+  const psLabel = (id, s) => t(id === 'mqtt' && s === 'connected' ? 'ps_connected_mqtt' : 'ps_' + s);
   const plugCls = (s) => (s === 'error' ? 'st-err' : s === 'disconnected' ? 'st-warn' : s === 'off' ? 'st-idle' : 'st-ok');
   const sinkStatus = (k) => (k.lastError ? 'err' : k.lastSuccessAt ? 'ok' : 'new');
   const sinkCls = (s) => (s === 'err' ? 'st-err' : s === 'ok' ? 'st-ok' : 'st-idle');
@@ -286,12 +288,12 @@
               <span class="stack-s" style="gap:2px"><strong>${esc(t('pl_' + x.id))}</strong><span class="small muted">${esc(t('pl_' + x.id + '_d'))}</span></span>
             </button>
             <div class="row-flex" style="padding:0 16px 12px 64px;gap:10px">
-              <span class="status-text grow ${plugCls(xs)}" style="font-weight:400;font-size:12.5px"><span class="dot"></span>${esc(t('ps_' + xs))}</span>
+              <span class="status-text grow ${plugCls(xs)}" style="font-weight:400;font-size:12.5px"><span class="dot"></span>${esc(psLabel(x.id, xs))}</span>
               <label class="row-flex small" style="gap:8px;min-height:36px"><input class="check" type="checkbox" ${x.enabled ? 'checked' : ''} data-change="plugEnabled" data-id="${x.id}"><span>${esc(t('pl_enabled'))}</span></label>
             </div>
           </section>`; }).join('')}</div>
         <section class="card" style="flex:3 1 520px;min-width:0;gap:18px">
-          <div class="row-flex"><h2 class="grow" style="font-size:18px">${esc(t('pl_' + p.id))}</h2><span class="status-text ${plugCls(s)}"><span class="dot"></span>${esc(t('ps_' + s))}</span></div>
+          <div class="row-flex"><h2 class="grow" style="font-size:18px">${esc(t('pl_' + p.id))}</h2><span class="status-text ${plugCls(s)}"><span class="dot"></span>${esc(psLabel(p.id, s))}</span></div>
           ${!p.enabled ? `<div class="notice row-flex"><span class="small" style="flex:1 1 260px">${esc(t('pl_off_note'))}</span><button type="button" class="btn s primary" data-act="plugOn" data-arg="${p.id}">${esc(t('turn_on'))}</button></div>` : ''}
           ${p.id === 'obs' ? `
             <div class="stack" style="gap:12px">
@@ -304,6 +306,29 @@
               </div>
               ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
+            </div>` : p.id === 'mqtt' ? `
+            <div class="stack" style="gap:12px">
+              <h3>${esc(t('mq_conn'))}</h3>
+              <div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:1 1 200px"><span>${esc(t('obs_host'))}</span><input class="input mono" type="text" value="${esc(p.config.host)}" data-change="mq" data-key="host"></label>
+                <label class="field" style="flex:0 0 100px"><span>${esc(t('obs_port'))}</span><input class="input mono" type="text" inputmode="numeric" value="${esc(p.config.port)}" data-change="mqNum" data-key="port"></label>
+                <label class="row-flex small" style="gap:8px;min-height:40px"><input class="check" type="checkbox" ${p.config.useTls ? 'checked' : ''} data-change="mqBool" data-key="useTls"><span>TLS</span></label>
+              </div>
+              <div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:1 1 180px"><span>${esc(t('mq_user'))}</span><input class="input" type="text" autocomplete="off" value="${esc(p.config.username)}" data-change="mq" data-key="username"></label>
+                <label class="field" style="flex:1 1 180px"><span>${esc(t('obs_pw'))}</span><input class="input" type="password" autocomplete="off" value="${esc(p.config.password)}" data-change="mq" data-key="password"></label>
+              </div>
+              <div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:1 1 200px"><span>${esc(t('mq_prefix'))}</span><input class="input mono" type="text" value="${esc(p.config.topicPrefix)}" data-change="mq" data-key="topicPrefix"></label>
+                <label class="field" style="flex:0 0 220px"><span>QoS</span><select class="select" data-change="mqNum" data-key="qos">${[0, 1, 2].map((q) => `<option value="${q}" ${p.config.qos === q ? 'selected' : ''}>${esc(t('mq_qos' + q))}</option>`).join('')}</select></label>
+                <button type="button" class="btn" data-act="testPlugin" data-arg="mqtt">${esc(t('obs_test'))}</button>
+              </div>
+              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('mq_err'))}</div>` : ''}
+              <div class="stack-s" style="gap:6px;padding-top:12px;border-top:1px solid var(--border)">
+                <h3>${esc(t('mq_topics'))}</h3>
+                <div class="row-flex small" style="gap:10px"><span class="mono" style="flex:0 0 260px">${esc(p.config.topicPrefix)}/events/&lt;type&gt;</span><span class="muted">${esc(t('mq_topic_events'))}</span></div>
+                <div class="row-flex small" style="gap:10px"><span class="mono" style="flex:0 0 260px">${esc(p.config.topicPrefix)}/status</span><span class="muted">${esc(t('mq_topic_status'))}</span></div>
+              </div>
             </div>` : `
             <div class="stack" style="gap:12px">
               <h3>${esc(t('au_apps'))}</h3><span class="small muted">${esc(t('au_apps_d'))}</span>
@@ -321,7 +346,7 @@
               </div>
               <label class="row-flex" style="gap:10px;min-height:40px;flex-wrap:nowrap"><input class="check" type="checkbox" ${p.config.restoreOnExit ? 'checked' : ''} data-change="restoreOnExit"><span>${esc(t('au_restore'))}</span></label>
             </div>`}
-          <div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
+          ${p.id === 'mqtt' ? `<span class="small muted">${esc(t('pl_apply'))}</span>` : `<div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
             <div class="row-flex"><h3 class="grow">${esc(t('pl_rules'))}</h3><button type="button" class="btn s" data-act="addRule">${esc(t('pl_add_rule'))}</button></div>
             ${p.rules.map((r) => `
               <div class="rule">
@@ -339,7 +364,7 @@
               </div>`).join('') || `<p class="small muted">${esc(t('pl_no_rules'))}</p>`}
             ${p.id === 'obs' ? `<span class="small muted">${esc(t('pl_placeholders'))}</span>` : ''}
             <span class="small muted">${esc(t('pl_apply'))}</span>
-          </div>
+          </div>`}
         </section>
       </div>`;
   }
@@ -568,6 +593,9 @@
     obsHost: (v) => editPlug((p) => { p.config.host = v.trim(); }, 'obs'),
     obsPort: (v) => editPlug((p) => { p.config.port = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'obs'),
     obsPw: (v) => editPlug((p) => { p.config.password = v; }, 'obs'),
+    mq: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.dataset.key === 'password' ? v : v.trim(); }, 'mqtt'),
+    mqNum: (v, el) => editPlug((p) => { p.config[el.dataset.key] = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'mqtt'),
+    mqBool: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.checked; }, 'mqtt'),
     appVol: (v, el) => editPlug((p) => { p.config.apps[Number(el.dataset.idx)].volume = Number(v); }),
     restoreOnExit: (v, el) => editPlug((p) => { p.config.restoreOnExit = el.checked; }),
     ruleEvent: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).event = v; }),
@@ -618,7 +646,7 @@
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },
-    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error' && id === 'obs') toast(t('obs_ok')); },
+    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error') toast(t(id === 'obs' ? 'obs_ok' : 'mq_ok')); },
     settings: (s) => { const wasDirty = dirty(); S.settings = s; if (!wasDirty) { S.draft = clone(s); S.hexDraft = s.killMarkerColor; } },
     diagnostics: (list) => { S.diagnostics = list; },
     hostProblems: (list) => { S.hostProblems = list; },

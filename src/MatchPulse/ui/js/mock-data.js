@@ -34,6 +34,9 @@
           { id: 'r2', event: 'kill', action: 'save_replay', param: '' },
           { id: 'r3', event: 'match_ended', action: 'stop_recording', param: '' }
         ] },
+      { id: 'mqtt', enabled: true, status: 'connected', lastError: null,
+        config: { host: 'homeassistant.local', port: 1883, useTls: false, username: 'matchpulse', password: 'secret', topicPrefix: 'matchpulse', qos: 1 },
+        rules: [] },
       { id: 'audio', enabled: false, status: 'ready',
         config: { apps: [{ name: 'Spotify.exe', volume: 20 }, { name: 'chrome.exe', volume: 40 }], restoreOnExit: true },
         rules: [
