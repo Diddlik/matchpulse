@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -29,6 +30,8 @@ public sealed class UiHub : IEventSink
     readonly HashSet<string> _problems = [];
     bool _game;
     JsonObject? _match;
+    string _obsStatus = "disconnected";
+    string? _obsError;
 
     sealed record SinkHealth(DateTimeOffset? LastSuccessAt, DateTimeOffset? LastFailureAt, string? Code, string? Message);
 
@@ -106,6 +109,7 @@ public sealed class UiHub : IEventSink
     /// <summary>Records the result of a delivery to an Event Sink (from <see cref="EventDispatcher.Delivered"/>).</summary>
     public void Delivered(IEventSink sink, Exception? error)
     {
+        if (sink is ObsSink) { ObsResult(error); return; }
         if (SinkId(sink) is not { } id) return;
         bool newFailure;
         lock (_lock)
@@ -171,9 +175,11 @@ public sealed class UiHub : IEventSink
                 foreach (var file in DiagnosticFiles()) TryDelete(file);
                 Send("diagnostics", Diagnostics());
                 break;
+            case "savePlugin" when (string?)payload!["id"] == "obs": Apply(_config() with { Obs = ObsFrom(payload!.AsObject()) }); break;
+            case "testPlugin" when (string?)payload!["id"] == "obs": _ = TestObsAsync(_config().Obs); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
-            // Plugins are not built yet; their page is hidden.
+            // The audio plugin is not built yet; only OBS is listed.
         }
     }
 
@@ -188,7 +194,7 @@ public sealed class UiHub : IEventSink
                 ["hostProblems"] = Problems(),
                 ["events"] = new JsonArray([.. _events.Select(e => e.DeepClone())]),
                 ["sinks"] = Sinks(config),
-                ["plugins"] = new JsonArray(),
+                ["plugins"] = new JsonArray(Obs(config.Obs)),
                 ["settings"] = Settings(config),
                 ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
@@ -229,6 +235,68 @@ public sealed class UiHub : IEventSink
                     Delivered(sink, e);
                 }
             });
+    }
+
+    // ---------- OBS plugin ----------
+
+    async Task TestObsAsync(ObsSettings settings)
+    {
+        try
+        {
+            var version = await ObsSink.TestAsync(settings, CancellationToken.None);
+            Logged(DateTimeOffset.Now, LogLevel.Information, $"OBS {version} reached at {settings.Host}:{settings.Port}");
+            ObsResult(null);
+        }
+        catch (Exception e)
+        {
+            Logged(DateTimeOffset.Now, LogLevel.Warning, $"OBS test at {settings.Host}:{settings.Port} failed: {e.Message}");
+            ObsResult(e);
+        }
+    }
+
+    void ObsResult(Exception? error)
+    {
+        bool newFailure;
+        lock (_lock)
+        {
+            newFailure = error is not null && _obsStatus != "error";
+            _obsStatus = error is null ? "connected" : "error";
+            _obsError = error is null ? null : ObsMessage(error);
+        }
+        Send("pluginStatus", new JsonObject { ["id"] = "obs", ["status"] = _obsStatus, ["lastError"] = _obsError });
+        if (newFailure) Problem?.Invoke("ObsFailed", "plugins");
+    }
+
+    static string ObsMessage(Exception e) => e switch
+    {
+        ObsException => e.Message,
+        WebSocketException or OperationCanceledException => "OBS is not reachable.",
+        _ => e.Message,
+    };
+
+    JsonObject Obs(ObsSettings obs)
+    {
+        lock (_lock)
+            return new JsonObject
+            {
+                ["id"] = "obs",
+                ["enabled"] = obs.Enabled,
+                ["status"] = _obsStatus,
+                ["lastError"] = _obsError,
+                ["config"] = new JsonObject { ["host"] = obs.Host, ["port"] = obs.Port, ["password"] = obs.Password },
+                ["rules"] = new JsonArray([.. obs.Rules.Select(r => (JsonNode)new JsonObject { ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["param"] = r.Param })]),
+            };
+    }
+
+    public static ObsSettings ObsFrom(JsonObject p)
+    {
+        var c = p["config"]!;
+        return new ObsSettings(
+            (bool?)p["enabled"] ?? false,
+            ((string?)c["host"] ?? "").Trim(),
+            (int?)c["port"] ?? 0,
+            (string?)c["password"] ?? "",
+            [.. p["rules"]!.AsArray().Select(r => new ObsRule((string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "", (string?)r["param"] ?? ""))]);
     }
 
     // ---------- JSON shapes ----------

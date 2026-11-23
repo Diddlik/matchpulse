@@ -74,6 +74,7 @@ static class Program
         [
             .. config.Webhooks.Select(url => new WebhookSink(http, url)),
             .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
+            .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs)] : Array.Empty<IEventSink>(),
         ];
 
     [DllImport("kernel32.dll")]

@@ -45,8 +45,7 @@
   const X_ICON = '<svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.4"/></svg>';
   const WARN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3l10 18H2z" fill="none" stroke="var(--warn)" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v5M12 18v.5" stroke="var(--warn)" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const OK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="var(--ok)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  // 'plugins' is designed but not built in the app yet: shown only in the browser preview (mock).
-  const NAV = ['status', 'events', 'live', 'sinks', 'plugins', 'setup', 'diag', 'log'].filter((p) => B.isMock || p !== 'plugins');
+  const NAV = ['status', 'events', 'live', 'sinks', 'plugins', 'setup', 'diag', 'log'];
   const SWATCHES = [['#FF3030', 'c_red'], ['#FFE000', 'c_yellow'], ['#30FF60', 'c_green'], ['#00E5FF', 'c_cyan'], ['#FF40FF', 'c_magenta'], ['#FFFFFF', 'c_white']];
 
   // ---------- Zustand ----------
@@ -258,7 +257,7 @@
     const p = S.plugins.find((x) => x.id === S.plugSel) || S.plugins[0];
     if (!p) return `<h1>${esc(t('nav_plugins'))}</h1>`;
     const s = plugStatus(p);
-    const actions = p.id === 'obs' ? ['start_recording', 'stop_recording', 'save_replay', 'switch_scene'] : ['duck', 'restore'];
+    const actions = p.id === 'obs' ? ['start_recording', 'stop_recording', 'start_replay_buffer', 'stop_replay_buffer', 'save_replay', 'switch_scene'] : ['duck', 'restore'];
     return `
       <h1>${esc(t('nav_plugins'))}</h1>
       <p class="muted" style="max-width:75ch">${esc(t('pl_intro'))}</p>
@@ -286,7 +285,7 @@
                 <label class="field" style="flex:1 1 180px"><span>${esc(t('obs_pw'))}</span><input class="input" type="password" autocomplete="off" value="${esc(p.config.password)}" data-change="obsPw"></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="obs">${esc(t('obs_test'))}</button>
               </div>
-              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(t('obs_err'))}</div>` : ''}
+              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
             </div>` : `
             <div class="stack" style="gap:12px">
@@ -581,7 +580,7 @@
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },
-    pluginStatus: ({ id, status }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status }) : p)); if (status !== 'error' && id === 'obs') toast(t('obs_ok')); },
+    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error' && id === 'obs') toast(t('obs_ok')); },
     settings: (s) => { const wasDirty = dirty(); S.settings = s; if (!wasDirty) { S.draft = clone(s); S.hexDraft = s.killMarkerColor; } },
     diagnostics: (list) => { S.diagnostics = list; },
     hostProblems: (list) => { S.hostProblems = list; },

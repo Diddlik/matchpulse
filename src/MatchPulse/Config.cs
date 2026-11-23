@@ -22,7 +22,8 @@ public sealed record Config(
     bool Diagnostics = false,
     string Theme = "system",
     bool NotifyOnProblems = true,
-    bool LiveMonitor = false)
+    bool LiveMonitor = false,
+    ObsSettings? Obs = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -33,6 +34,8 @@ public sealed record Config(
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public IReadOnlyList<string> Scripts { get; init; } = Scripts ?? [];
+
+    public ObsSettings Obs { get; init; } = Obs ?? new ObsSettings();
 
     public static Config LoadOrDefault(string path) => File.Exists(path) ? Load(path) : new Config([]);
 
@@ -64,7 +67,23 @@ public sealed record Config(
         if (!Languages.Contains(GameLanguage)) throw new InvalidDataException($"{path}: \"gameLanguage\" must be de or en.");
         if (!Themes.Contains(Theme)) throw new InvalidDataException($"{path}: \"theme\" must be system, light or dark.");
         if (!Languages.Contains(UiLanguage)) throw new InvalidDataException($"{path}: \"uiLanguage\" must be de or en.");
+        if (Obs.Port is < 1 or > 65535) throw new InvalidDataException($"{path}: OBS port must be between 1 and 65535.");
+        if (Obs.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || !ObsSettings.Actions.Contains(r.Action)))
+            throw new InvalidDataException($"{path}: an OBS rule has an unknown event or action.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");
     }
 }
+
+/// <summary>OBS plugin: OBS WebSocket (v5) connection and the rules "when Game Event, do action".
+/// The password is stored as typed, like OBS stores it in its own settings.</summary>
+public sealed record ObsSettings(bool Enabled = false, string Host = "localhost", int Port = 4455, string Password = "", IReadOnlyList<ObsRule>? Rules = null)
+{
+    public static readonly string[] Events = ["match_started", "kill", "match_ended"];
+    public static readonly string[] Actions = ["start_recording", "stop_recording", "start_replay_buffer", "stop_replay_buffer", "save_replay", "switch_scene"];
+
+    public IReadOnlyList<ObsRule> Rules { get; init; } = Rules ?? [];
+}
+
+/// <summary>When <see cref="Event"/> happens, run <see cref="Action"/>; <see cref="Param"/> is the scene name for <c>switch_scene</c>.</summary>
+public sealed record ObsRule(string Id, string Event, string Action, string Param = "");
