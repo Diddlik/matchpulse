@@ -11,6 +11,7 @@ static class Ui
             "The config file is invalid; defaults apply. Saving in Settings overwrites it."),
         ["SinkFailed"] = ("Ein Ziel hat ein Ereignis nicht angenommen. Klicken für Details.", "A target did not accept an event. Click for details."),
         ["CaptureFailed"] = ("Die Bildschirmaufnahme ist fehlgeschlagen und wird wiederholt.", "Screen capture failed and is being retried."),
+        ["ObsFailed"] = ("OBS hat eine Regel nicht ausgeführt. Klicken für Details.", "OBS did not run a rule. Click for details."),
         [nameof(TrayState.GameNotRunning)] = ("Spiel läuft nicht", "Game not running"),
         [nameof(TrayState.GameRunning)] = ("Spiel läuft", "Game running"),
         [nameof(TrayState.MatchRunning)] = ("Match läuft", "Match running"),
