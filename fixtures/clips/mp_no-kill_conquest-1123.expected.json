@@ -1,0 +1,8 @@
+{
+  "clip": "mp_no-kill_conquest-1123.mkv",
+  "source": { "recording": "live capture 2026-11-23, Conquest (multiplayer), 15 fps", "start": 300, "duration": 10 },
+  "encoding": "re-encoded: libx264 CRF 26, 15 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [],
+  "notes": "Multiplayer play without a kill: no Game Event."
+}

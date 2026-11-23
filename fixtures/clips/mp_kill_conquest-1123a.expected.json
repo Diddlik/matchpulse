@@ -1,0 +1,8 @@
+{
+  "clip": "mp_kill_conquest-1123a.mkv",
+  "source": { "recording": "live capture 2026-11-23, Conquest (multiplayer), 15 fps", "start": 48.5, "duration": 5 },
+  "encoding": "re-encoded: libx264 CRF 26, 15 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [{ "type": "kill", "offset": 1.3, "data": {} }],
+  "notes": "Multiplayer kill outside a REDSEC Match: red Kill Marker at 1.3 s, plain skull (no tick) with 250 in the Score Popup from 1.8 s. No matchId."
+}

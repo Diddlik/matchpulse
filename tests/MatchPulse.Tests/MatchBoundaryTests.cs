@@ -84,19 +84,22 @@ public class MatchBoundaryTests
     }
 
     [Fact]
-    public void Kill_outside_a_Match_is_not_reported()
+    public void Kill_outside_a_Match_is_reported_without_matchId()
     {
         var detector = new MatchDetector();
         var frame = Frame(hud: false);
         using (var marker = Cv2.ImRead(Path.Combine(Cues, "kill_marker.png")))
             marker.CopyTo(frame[new Rect(1180, 620, marker.Width, marker.Height)]);
-        using (var badge = Cv2.ImRead(Path.Combine(Cues, "kill_badge.png")))
+        using (var badge = Cv2.ImRead(Path.Combine(Cues, "kill_badge_plain.png")))
             badge.CopyTo(frame[new Rect(900, 920, badge.Width, badge.Height)]);
 
-        // At 10 checks per second: Kill Marker and Kill Badge together, held for a second.
-        var events = Enumerable.Range(0, 10).SelectMany(i => detector.Process(new Frame(Start.AddMilliseconds(i * 100), frame)));
+        // At 10 checks per second: Kill Marker and the multiplayer Kill Badge together, held for a second.
+        var events = Enumerable.Range(0, 10).SelectMany(i => detector.Process(new Frame(Start.AddMilliseconds(i * 100), frame))).ToList();
 
-        Assert.Empty(events);
+        var kill = Assert.Single(events);
+        Assert.Equal("kill", kill.Type);
+        Assert.Null(kill.MatchId);
+        Assert.Equal(1, kill.Sequence);
     }
 
     static List<GameEvent> Run(MatchDetector detector, params Mat[][] segments)

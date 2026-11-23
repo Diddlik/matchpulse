@@ -21,7 +21,7 @@ The Player's teammates in a Match. Their actions are not reported as the Player'
 _Avoid_: team, party
 
 **Kill**:
-The Player finishing off an opponent.
+The Player finishing off an opponent, in any game mode. A Kill outside a Match (regular multiplayer) belongs to no Match.
 _Avoid_: elimination, frag
 
 **Cue**:
@@ -40,7 +40,7 @@ The row of icons with a point total that appears just below the crosshair while 
 _Avoid_: score display, notification
 
 **Kill Badge**:
-The skull-with-tick icon in the Score Popup that appears when a kill is credited to the Player. It also appears when the Squad finishes an opponent the Player knocked down, so it proves a Kill only when a Kill Marker came shortly before it.
+The skull icon in the Score Popup that appears when a kill is credited to the Player: with a tick in REDSEC, without one in regular multiplayer. It also appears when the Squad finishes an opponent the Player knocked down, so it proves a Kill only when a Kill Marker came shortly before it.
 _Avoid_: skull, kill icon
 
 **Knockdown Badge**:

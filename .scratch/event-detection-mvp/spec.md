@@ -71,7 +71,7 @@ MatchPulse is a small Windows tray app. While `bf6.exe` runs, it watches the scr
 ## Out of Scope
 
 - Recording video or controlling OBS directly. OBS is driven through a Script sink or a later dedicated consumer, which also owns the post-roll delay and the rule of never stopping a manual recording.
-- Game modes other than REDSEC, including regular multiplayer. Kill detection must not depend on the REDSEC counter bar, so it can be reused there later.
+- Match boundaries in game modes other than REDSEC. Kills are reported in every mode (ticket 09); outside a REDSEC Match they carry `matchId: null`.
 - A `knockdown` event (planned next, the Knockdown Badge makes it cheap), own death, squad events and other events beyond `match_started`, `kill` and `match_ended`.
 - Recognising the game mode. A later option is to read it from the start screen.
 - MQTT and RPC sinks. MQTT is the planned next sink.
