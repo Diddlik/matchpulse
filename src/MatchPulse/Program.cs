@@ -22,9 +22,19 @@ static class Program
         switch (args)
         {
             case [] or ["--show"]:
+            {
+                // One tray app per user: a second start (e.g. from the Start menu) only opens the running one's window.
+                using var single = new Mutex(true, @"Local\MatchPulse", out var first);
+                using var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\MatchPulse.Show");
+                if (!first)
+                {
+                    show.Set();
+                    return 0;
+                }
                 ApplicationConfiguration.Initialize();
-                Application.Run(new TrayApp(Config.DefaultPath, file, log, showWindow: args is ["--show"]));
+                Application.Run(new TrayApp(Config.DefaultPath, file, log, showWindow: args is ["--show"], showRequested: show));
                 return 0;
+            }
             case ["replay", var video, .. var rest] when rest is [] or ["--config", _]:
                 return Replay(video, configPath, log);
             case ["live"] or ["live", "--config", _]:
