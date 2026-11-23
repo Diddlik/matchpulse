@@ -16,7 +16,87 @@ public sealed class ObsSinkTests : IDisposable
 
     ObsSettings Settings(string password = "secret", params ObsRule[] rules) => new(true, "localhost", _obs.Port, password, rules);
 
-    static GameEvent Event(string type) => new(type, "m1", 1, Start, new Dictionary<string, string>());
+    static GameEvent Event(string type, int sequence = 1) => new(type, "m1", sequence, Start, new Dictionary<string, string>());
+
+    static async Task Until(Func<bool> condition)
+    {
+        for (var i = 0; i < 100 && !condition(); i++) await Task.Delay(50);
+        Assert.True(condition());
+    }
+
+    [Fact]
+    public void Placeholders_are_filled_from_the_Game_Event()
+    {
+        var kill = new GameEvent("kill", "91fdb6ce4f2a", 4, Start, new Dictionary<string, string>());
+        var mpKill = new GameEvent("kill", null, 2, Start, new Dictionary<string, string>());
+        var ended = new GameEvent("match_ended", "91fdb6ce4f2a", 5, Start, new Dictionary<string, string> { ["result"] = "victory" });
+
+        Assert.Equal("2026-11-23_91fdb6ce_Kill-3_20-00-00", ObsTemplate.Fill("{date}_{match}_Kill-{kills}_{time}", kill));
+        Assert.Equal("mp 2 kills", ObsTemplate.Fill("{match} {kills} kills", mpKill));
+        Assert.Equal("victory with 3 kills (#5)", ObsTemplate.Fill("{result} with {kills} kills (#{n})", ended));
+    }
+
+    [Fact]
+    public async Task Chapter_marker_and_text_take_the_kill_count()
+    {
+        var sink = new ObsSink(Settings("secret",
+            new ObsRule("r1", "kill", "record_chapter"),
+            new ObsRule("r2", "kill", "set_text", "Kills", "Kills: {kills}")));
+
+        await sink.SendAsync(Event("kill", sequence: 3), default);
+
+        Assert.Equal(["CreateRecordChapter", "SetInputSettings"], _obs.Requests.Select(r => r.Type));
+        Assert.Equal("Kill 2", (string?)_obs.Requests[0].Data!["chapterName"]);
+        Assert.Equal(("Kills", "Kills: 2"), ((string?)_obs.Requests[1].Data!["inputName"], (string?)_obs.Requests[1].Data!["inputSettings"]!["text"]));
+    }
+
+    [Fact]
+    public async Task Source_is_shown_in_the_current_scene_and_hidden_after_its_duration()
+    {
+        var later = new List<Exception?>();
+        var sink = new ObsSink(Settings("secret", new ObsRule("r1", "kill", "show_source", "Kill overlay", DurationSeconds: 0.3)), (_, e) => later.Add(e));
+
+        await sink.SendAsync(Event("kill"), default);
+        var shown = _obs.Requests.Last();
+        await Until(() => later.Count == 1);
+
+        Assert.Equal(("Game", 7, true), ((string?)shown.Data!["sceneName"], (int)shown.Data["sceneItemId"]!, (bool)shown.Data["sceneItemEnabled"]!));
+        Assert.Null(later[0]);
+        Assert.False((bool)_obs.Requests.Last().Data!["sceneItemEnabled"]!);
+    }
+
+    [Fact]
+    public async Task Delayed_rule_runs_later_without_holding_up_the_Game_Event()
+    {
+        var later = new List<Exception?>();
+        var sink = new ObsSink(Settings("secret", new ObsRule("r1", "kill", "save_replay", DelaySeconds: 0.3)), (_, e) => later.Add(e));
+
+        await sink.SendAsync(Event("kill"), default);
+        Assert.Empty(_obs.Requests);
+        await Until(() => later.Count == 1);
+
+        Assert.Equal("SaveReplayBuffer", Assert.Single(_obs.Requests).Type);
+        Assert.Null(later[0]);
+    }
+
+    [Fact]
+    public async Task Saved_replay_is_renamed_from_its_template()
+    {
+        var folder = Directory.CreateTempSubdirectory("mp-replays-").FullName;
+        try
+        {
+            _obs.ReplayPath = Path.Combine(folder, "Replay 2026-11-23 20-00-01.mkv");
+            File.WriteAllText(_obs.ReplayPath, "");
+
+            await new ObsSink(Settings("secret", new ObsRule("r1", "kill", "save_replay", "{date}_{match}_Kill-{kills}"))).SendAsync(Event("kill", sequence: 2), default);
+
+            Assert.Equal(["2026-11-23_m1_Kill-1.mkv"], Directory.GetFiles(folder).Select(Path.GetFileName));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
 
     [Fact]
     public async Task Rules_for_the_Game_Event_run_as_OBS_requests_after_authenticating()
@@ -99,6 +179,7 @@ public sealed class ObsSinkTests : IDisposable
         public bool Authenticated { get; private set; }
         public List<(string Type, JsonNode? Data)> Requests { get; } = [];
         public Dictionary<string, int> Fail { get; } = [];
+        public string? ReplayPath { get; set; }
 
         async Task AcceptAsync()
         {
@@ -106,13 +187,20 @@ public sealed class ObsSinkTests : IDisposable
             {
                 HttpListenerContext context;
                 try { context = await _listener.GetContextAsync(); } catch (Exception) { return; }
+                _ = Task.Run(() => ServeAsync(context));
+            }
+        }
+
+        async Task ServeAsync(HttpListenerContext context)
+        {
+            {
                 var ws = (await context.AcceptWebSocketAsync("obswebsocket.json")).WebSocket;
                 await SendAsync(ws, new JsonObject { ["op"] = 0, ["d"] = new JsonObject { ["rpcVersion"] = 1, ["authentication"] = new JsonObject { ["salt"] = Salt, ["challenge"] = Challenge } } });
                 var identify = await ReceiveAsync(ws);
-                if ((string?)identify!["d"]!["authentication"] != ObsClient.Authentication(_password, Salt, Challenge))
+                if ((string?)identify!["d"]!["authentication"] != ObsSession.Authentication(_password, Salt, Challenge))
                 {
                     await ws.CloseAsync((WebSocketCloseStatus)4009, "Authentication failed.", default);
-                    continue;
+                    return;
                 }
                 Authenticated = true;
                 await SendAsync(ws, new JsonObject { ["op"] = 2, ["d"] = new JsonObject { ["negotiatedRpcVersion"] = 1 } });
@@ -128,9 +216,17 @@ public sealed class ObsSinkTests : IDisposable
                         {
                             ["requestType"] = type, ["requestId"] = (string?)request["d"]!["requestId"],
                             ["requestStatus"] = new JsonObject { ["result"] = code == 100, ["code"] = code },
-                            ["responseData"] = type == "GetVersion" ? new JsonObject { ["obsVersion"] = "31.0.0" } : null,
+                            ["responseData"] = type switch
+                            {
+                                "GetVersion" => new JsonObject { ["obsVersion"] = "31.0.0" },
+                                "GetCurrentProgramScene" => new JsonObject { ["currentProgramSceneName"] = "Game" },
+                                "GetSceneItemId" => new JsonObject { ["sceneItemId"] = 7 },
+                                _ => null,
+                            },
                         },
                     });
+                    if (type == "SaveReplayBuffer" && ReplayPath is { } path)
+                        await SendAsync(ws, new JsonObject { ["op"] = 5, ["d"] = new JsonObject { ["eventType"] = "ReplayBufferSaved", ["eventData"] = new JsonObject { ["savedReplayPath"] = path } } });
                 }
             }
         }

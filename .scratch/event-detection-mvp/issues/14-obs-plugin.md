@@ -18,4 +18,4 @@
 - Connects per Game Event (they are seconds apart), so there is no connection to keep alive. A kill's `save_replay` therefore reaches OBS about 0.5 s after the kill plus the connect time (a few ms locally).
 - The OBS password is stored in the config as typed, as OBS stores it in its own settings.
 - The audio plugin from the template is not built; only OBS is listed.
-- Ideas for later: recording chapter markers per kill (`CreateRecordChapter`, OBS 30.2+), split the recording file per Match (`SplitRecordFile`), delay before saving the replay, a text source with the kill count, show/hide a source (kill overlay), screenshot per kill (`SaveSourceScreenshot`), start/stop streaming, pause/resume recording, and rename saved replays with Match and kill number.
+- The ideas for later are built in ticket 15.

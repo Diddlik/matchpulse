@@ -284,7 +284,11 @@ public sealed class UiHub : IEventSink
                 ["status"] = _obsStatus,
                 ["lastError"] = _obsError,
                 ["config"] = new JsonObject { ["host"] = obs.Host, ["port"] = obs.Port, ["password"] = obs.Password },
-                ["rules"] = new JsonArray([.. obs.Rules.Select(r => (JsonNode)new JsonObject { ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["param"] = r.Param })]),
+                ["rules"] = new JsonArray([.. obs.Rules.Select(r => (JsonNode)new JsonObject
+                {
+                    ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["param"] = r.Param,
+                    ["text"] = r.Text, ["delaySeconds"] = r.DelaySeconds, ["durationSeconds"] = r.DurationSeconds,
+                })]),
             };
     }
 
@@ -296,7 +300,9 @@ public sealed class UiHub : IEventSink
             ((string?)c["host"] ?? "").Trim(),
             (int?)c["port"] ?? 0,
             (string?)c["password"] ?? "",
-            [.. p["rules"]!.AsArray().Select(r => new ObsRule((string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "", (string?)r["param"] ?? ""))]);
+            [.. p["rules"]!.AsArray().Select(r => new ObsRule(
+                (string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "",
+                ((string?)r["param"] ?? "").Trim(), (string?)r["text"] ?? "", (double?)r["delaySeconds"] ?? 0, (double?)r["durationSeconds"] ?? 0))]);
     }
 
     // ---------- JSON shapes ----------
