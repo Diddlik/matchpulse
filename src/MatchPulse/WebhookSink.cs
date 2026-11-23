@@ -12,5 +12,7 @@ public sealed class WebhookSink(HttpClient http, Uri url) : IEventSink
         response.EnsureSuccessStatusCode();
     }
 
+    public Uri Url => url;
+
     public override string ToString() => $"webhook {url}";
 }

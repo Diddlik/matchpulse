@@ -15,6 +15,9 @@ public sealed class FileLog(string path, long maxBytes = 1_000_000) : ILoggerPro
 
     public string FilePath { get; } = path;
 
+    /// <summary>Every logged line (time, level, message), raised on the logging thread.</summary>
+    public event Action<DateTimeOffset, LogLevel, string>? Written;
+
     public ILogger CreateLogger(string categoryName) => new Logger(this);
 
     void Write(string line)
@@ -59,8 +62,12 @@ public sealed class FileLog(string path, long maxBytes = 1_000_000) : ILoggerPro
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             if (!IsEnabled(logLevel)) return;
-            var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff} {logLevel,-11} {formatter(state, exception)}";
+            var at = DateTimeOffset.Now;
+            var message = formatter(state, exception);
+            var line = $"{at:yyyy-MM-dd HH:mm:ss.fff} {logLevel,-11} {message}";
             file.Write(exception is null ? line : $"{line}{Environment.NewLine}{exception}");
+            try { file.Written?.Invoke(at, logLevel, exception is null ? message : $"{message}: {exception.Message}"); }
+            catch (Exception) { }
         }
     }
 }

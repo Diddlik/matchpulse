@@ -37,5 +37,7 @@ public sealed class ScriptSink(string command, TimeSpan timeout) : IEventSink
         if (process.ExitCode != 0) throw new InvalidOperationException($"{this} exited with code {process.ExitCode}.");
     }
 
+    public string Command => command;
+
     public override string ToString() => $"script {command}";
 }
