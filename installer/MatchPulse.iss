@@ -57,9 +57,11 @@ Type: filesandordirs; Name: "{app}\ui"
 Type: filesandordirs; Name: "{app}\cues"
 
 [Icons]
-Name: "{group}\MatchPulse"; Filename: "{app}\MatchPulse.exe"; Parameters: "--show"
-Name: "{group}\{cm:UninstallProgram,MatchPulse}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\MatchPulse"; Filename: "{app}\MatchPulse.exe"; Parameters: "--show"; Tasks: desktopicon
+; Created only when missing: an update keeps existing shortcuts as they are (place on the desktop, own icon or
+; parameters, taskbar pins). The first installation registered them, so uninstall still removes them.
+Name: "{group}\MatchPulse"; Filename: "{app}\MatchPulse.exe"; Parameters: "--show"; Check: ShortcutMissing('{group}\MatchPulse.lnk')
+Name: "{group}\{cm:UninstallProgram,MatchPulse}"; Filename: "{uninstallexe}"; Check: ShortcutMissing('{group}\{cm:UninstallProgram,MatchPulse}.lnk')
+Name: "{autodesktop}\MatchPulse"; Filename: "{app}\MatchPulse.exe"; Parameters: "--show"; Tasks: desktopicon; Check: ShortcutMissing('{autodesktop}\MatchPulse.lnk')
 
 [Registry]
 ; Autostart in the tray, without opening the window.
@@ -75,6 +77,11 @@ Filename: "{app}\MatchPulse.exe"; Flags: nowait; Check: Relaunch
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -Command ""Get-Process MatchPulse -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopMatchPulse"
 
 [Code]
+function ShortcutMissing(Path: String): Boolean;
+begin
+  Result := not FileExists(ExpandConstant(Path));
+end;
+
 function Relaunch: Boolean;
 begin
   Result := ExpandConstant('{param:relaunch|0}') = '1';
