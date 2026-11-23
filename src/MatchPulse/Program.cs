@@ -37,7 +37,7 @@ static class Program
 
     static int Live(string configPath, ILogger log)
     {
-        var config = Config.Load(configPath);
+        var config = configPath == Config.DefaultPath ? Config.LoadOrDefault(configPath) : Config.Load(configPath);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         var dispatcher = new EventDispatcher(Sinks(config, http), log);
         using var stop = new CancellationTokenSource();
@@ -49,7 +49,7 @@ static class Program
 
     static int Replay(string video, string configPath, ILogger log)
     {
-        var config = Config.Load(configPath);
+        var config = configPath == Config.DefaultPath ? Config.LoadOrDefault(configPath) : Config.Load(configPath);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         var dispatcher = new EventDispatcher(Sinks(config, http), log);
         var detector = new MatchDetector(log, hudLostAfter: TimeSpan.FromSeconds(config.HudLostAfterSeconds), gameLanguage: config.GameLanguage, killMarkerColor: config.KillMarkerColor);
