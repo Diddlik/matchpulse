@@ -1,0 +1,68 @@
+/* MatchPulse UI – Design-Tokens.
+   Alle Farben, Schriften, Radien und Abstände der Oberfläche stehen hier.
+   Das Design wird über das Attribut data-theme="dark|light" auf <html> gewählt
+   (app.js setzt es aus der Einstellung "Design" bzw. aus prefers-color-scheme). */
+
+:root,
+:root[data-theme="dark"] {
+  --bg: #1b1c1e;
+  --side: #202124;
+  --surface: #2a2b2e;
+  --surface2: #323337;
+  --hover: #3a3b40;
+  --border: #3d3e43;
+  --text: #f2f2f3;
+  --muted: #b9babe;
+  --accent: #60cdff;
+  --accent-fg: #06121a;
+  --ok: #6ccb5f;
+  --warn: #ffb757;
+  --warn-fg: #1a1100;
+  --err: #ff9aa6;
+  --err-fg: #1b0003;
+  --idle: #a7a8ad;
+  --code: #17181a;
+  --game-bg: #2c3138;      /* Hintergrund der Spiel-Vorschauen (Diagnose, Kill-Markierung) */
+  --game-frame: #3b4148;
+  --game-text: #c9ced6;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f4f5;
+  --side: #ebebed;
+  --surface: #ffffff;
+  --surface2: #f6f6f7;
+  --hover: #e6e6e9;
+  --border: #dcdce0;
+  --text: #18181b;
+  --muted: #55565c;
+  --accent: #005fb8;
+  --accent-fg: #ffffff;
+  --ok: #0f7b0f;
+  --warn: #9a5b00;
+  --warn-fg: #ffffff;
+  --err: #c42b1c;
+  --err-fg: #ffffff;
+  --idle: #686970;
+  --code: #f1f1f3;
+  color-scheme: light;
+}
+
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+  --fs-base: 14px;
+  --fs-small: 12.5px;
+  --fs-caption: 12px;
+  --fs-h1: 26px;
+  --fs-h2: 16px;
+  --radius-s: 4px;
+  --radius: 6px;
+  --radius-m: 8px;
+  --radius-l: 10px;
+  --gap: 20px;
+  --hit: 44px;          /* Mindesthöhe klickbarer Zeilen */
+  --sidebar-w: 220px;
+}

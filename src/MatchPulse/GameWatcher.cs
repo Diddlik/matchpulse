@@ -14,10 +14,10 @@ public static class GameWatcher
     static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
 
     /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.
-    /// <paramref name="gameLanguage"/> and <paramref name="killMarkerColor"/> are read each time <c>bf6.exe</c> starts, so a changed setting applies from the next game run without restarting MatchPulse.
+    /// <paramref name="config"/> is read each time <c>bf6.exe</c> starts, so changed settings apply from the next game run without restarting MatchPulse.
     /// When stopped during a Match, <c>match_ended</c> with <c>reason: stopped</c> is dispatched before returning.
-    /// With <paramref name="diagnosticsFolder"/>, unconfirmed Kill cases are saved there as snapshots (diagnostic mode).</summary>
-    public static void Run(double checksPerSecond, Func<string> gameLanguage, Func<string> killMarkerColor, TimeSpan hudLostAfter, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null, string? diagnosticsFolder = null)
+    /// With <see cref="Config.Diagnostics"/>, unconfirmed Kill cases are saved to <see cref="DiagnosticSnapshots.DefaultFolder"/> (diagnostic mode).</summary>
+    public static void Run(Func<Config> config, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -30,9 +30,12 @@ public static class GameWatcher
             }
 
             var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
+            var settings = config();
+            var checksPerSecond = settings.ChecksPerSecond;
+            var diagnosticsFolder = settings.Diagnostics ? DiagnosticSnapshots.DefaultFolder : null;
             log.LogInformation("bf6.exe started on monitor {Monitor}: watching at {Checks} checks/s", monitor, checksPerSecond);
             gameRunning?.Invoke(true);
-            var detector = new MatchDetector(log, hudLostAfter: hudLostAfter, gameLanguage: gameLanguage(), killMarkerColor: killMarkerColor());
+            var detector = new MatchDetector(log, hudLostAfter: TimeSpan.FromSeconds(settings.HudLostAfterSeconds), gameLanguage: settings.GameLanguage, killMarkerColor: settings.KillMarkerColor);
             using var snapshots = diagnosticsFolder is null ? null : new DiagnosticSnapshots(diagnosticsFolder, log);
             if (snapshots is not null)
             {

@@ -21,16 +21,16 @@ static class Program
         var configPath = args is [.., "--config", var path] ? path : Config.DefaultPath;
         switch (args)
         {
-            case []:
+            case [] or ["--show"]:
                 ApplicationConfiguration.Initialize();
-                Application.Run(new TrayApp(Config.DefaultPath, file.FilePath, log));
+                Application.Run(new TrayApp(Config.DefaultPath, file, log, showWindow: args is ["--show"]));
                 return 0;
             case ["replay", var video, .. var rest] when rest is [] or ["--config", _]:
                 return Replay(video, configPath, log);
             case ["live"] or ["live", "--config", _]:
                 return Live(configPath, log);
             default:
-                Console.Error.WriteLine("Usage: MatchPulse\n       MatchPulse replay <video> [--config <path>]\n       MatchPulse live [--config <path>]");
+                Console.Error.WriteLine("Usage: MatchPulse [--show]\n       MatchPulse replay <video> [--config <path>]\n       MatchPulse live [--config <path>]");
                 return 2;
         }
     }
@@ -42,8 +42,7 @@ static class Program
         var dispatcher = new EventDispatcher(Sinks(config, http), log);
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
-        GameWatcher.Run(config.ChecksPerSecond, () => config.GameLanguage, () => config.KillMarkerColor, TimeSpan.FromSeconds(config.HudLostAfterSeconds), dispatcher.Dispatch, log, stop.Token,
-            diagnosticsFolder: config.Diagnostics ? DiagnosticSnapshots.DefaultFolder : null);
+        GameWatcher.Run(() => config, dispatcher.Dispatch, log, stop.Token);
         dispatcher.CompleteAsync().GetAwaiter().GetResult();
         return 0;
     }

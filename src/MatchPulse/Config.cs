@@ -18,12 +18,15 @@ public sealed record Config(
     string UiLanguage = "en",
     double HudLostAfterSeconds = 120,
     string KillMarkerColor = "#FF0000",
-    bool Diagnostics = false)
+    bool Diagnostics = false,
+    string Theme = "system",
+    bool NotifyOnProblems = true)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
 
     public static readonly string[] Languages = ["de", "en"];
+    public static readonly string[] Themes = ["system", "light", "dark"];
 
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
@@ -57,6 +60,7 @@ public sealed record Config(
         if (Scripts.Any(string.IsNullOrWhiteSpace)) throw new InvalidDataException($"{path}: a script is empty.");
         if (HudLostAfterSeconds <= 0) throw new InvalidDataException($"{path}: \"hudLostAfterSeconds\" must be positive.");
         if (!Languages.Contains(GameLanguage)) throw new InvalidDataException($"{path}: \"gameLanguage\" must be de or en.");
+        if (!Themes.Contains(Theme)) throw new InvalidDataException($"{path}: \"theme\" must be system, light or dark.");
         if (!Languages.Contains(UiLanguage)) throw new InvalidDataException($"{path}: \"uiLanguage\" must be de or en.");
         if (KillMarkerColor is null || !Regex.IsMatch(KillMarkerColor, "^#[0-9A-Fa-f]{6}$"))
             throw new InvalidDataException($"{path}: \"killMarkerColor\" must be a colour like #FF0000.");

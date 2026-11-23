@@ -19,6 +19,9 @@ public sealed class EventDispatcher
     List<(Channel<GameEvent> Queue, Task Worker)> _sinks;
     readonly List<Task> _replaced = []; // workers of replaced sinks, still delivering their queues
 
+    /// <summary>After each delivery attempt: the sink and the failure, or null on success. Raised on the sink's worker.</summary>
+    public event Action<IEventSink, Exception?>? Delivered;
+
     public EventDispatcher(IEnumerable<IEventSink> sinks, ILogger log)
     {
         _log = log;
@@ -73,10 +76,12 @@ public sealed class EventDispatcher
             try
             {
                 await sink.SendAsync(gameEvent, CancellationToken.None);
+                Delivered?.Invoke(sink, null);
             }
             catch (Exception e)
             {
                 _log.LogWarning(e, "Event Sink {Sink} failed for {Type} #{Sequence}", sink, gameEvent.Type, gameEvent.Sequence);
+                Delivered?.Invoke(sink, e);
             }
         }
     }
