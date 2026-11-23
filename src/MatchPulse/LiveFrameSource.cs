@@ -19,7 +19,8 @@ public static class LiveFrameSource
     static readonly Cue[] Cues = typeof(Cue).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Select(f => f.GetValue(null)).OfType<Cue>().ToArray();
 
-    public static IEnumerable<Frame> Read(IntPtr monitor, double checksPerSecond, CancellationToken stop)
+    /// <param name="extraRegions">Screen areas (relative) captured in addition to the Cue regions, for diagnostic mode.</param>
+    public static IEnumerable<Frame> Read(IntPtr monitor, double checksPerSecond, CancellationToken stop, IReadOnlyList<Rect2d>? extraRegions = null)
     {
         if (checksPerSecond is < 5 or > 10)
             throw new ArgumentOutOfRangeException(nameof(checksPerSecond), checksPerSecond, "Must be between 5 and 10.");
@@ -27,7 +28,7 @@ public static class LiveFrameSource
 
         while (!stop.IsCancellationRequested)
         {
-            using var capture = Capture.Open(monitor);
+            using var capture = Capture.Open(monitor, extraRegions ?? []);
             while (!stop.IsCancellationRequested)
             {
                 var next = DateTimeOffset.Now + interval;
@@ -49,14 +50,14 @@ public static class LiveFrameSource
         readonly int _width, _height;
         readonly Rect[] _regions;
 
-        Capture(ID3D11Device device, ID3D11DeviceContext context, IDXGIOutputDuplication duplication)
+        Capture(ID3D11Device device, ID3D11DeviceContext context, IDXGIOutputDuplication duplication, IReadOnlyList<Rect2d> extraRegions)
         {
             _device = device;
             _context = context;
             _duplication = duplication;
             var mode = duplication.Description.ModeDescription;
             (_width, _height) = ((int)mode.Width, (int)mode.Height);
-            _regions = Cues.Select(c => c.Region(new Size(_width, _height))).ToArray();
+            _regions = [.. Cues.Select(c => c.Region(new Size(_width, _height))), .. extraRegions.Select(r => Cue.Pixels(r, new Size(_width, _height)))];
             _staging = device.CreateTexture2D(new Texture2DDescription
             {
                 Width = mode.Width, Height = mode.Height, MipLevels = 1, ArraySize = 1,
@@ -65,7 +66,7 @@ public static class LiveFrameSource
             });
         }
 
-        public static Capture Open(IntPtr monitor)
+        public static Capture Open(IntPtr monitor, IReadOnlyList<Rect2d> extraRegions)
         {
             using var factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
             for (uint a = 0; factory.EnumAdapters1(a, out var adapter).Success; a++)
@@ -77,7 +78,7 @@ public static class LiveFrameSource
                     if (output.Description.Monitor != monitor) continue;
                     D3D11.D3D11CreateDevice(adapter, DriverType.Unknown, DeviceCreationFlags.None, [FeatureLevel.Level_11_0, FeatureLevel.Level_10_0], out ID3D11Device device, out ID3D11DeviceContext context).CheckError();
                     using var output1 = output.QueryInterface<IDXGIOutput1>();
-                    return new Capture(device, context, output1.DuplicateOutput(device));
+                    return new Capture(device, context, output1.DuplicateOutput(device), extraRegions);
                 }
             }
             throw new InvalidOperationException($"No DXGI output for monitor {monitor}.");

@@ -176,6 +176,34 @@ public class KillDetectionTests
         Assert.Equal(Start.AddMilliseconds(300), Assert.Single(events).OccurredAt);
     }
 
+    // Diagnostic mode: the Match Detector reports the cases where a Kill may have been missed.
+    static List<(string What, DateTimeOffset At)> Unconfirmed(params Mat[][] segments)
+    {
+        var detector = new MatchDetector();
+        var cases = new List<(string, DateTimeOffset)>();
+        detector.Unconfirmed += (what, at) => cases.Add((what, at));
+        RunWith(detector, segments);
+        return cases;
+    }
+
+    [Fact]
+    public void Kill_Badge_without_a_Kill_Marker_is_reported_as_unconfirmed()
+    {
+        Assert.Equal([("kill_badge_without_kill_marker", Start.AddMilliseconds(300))], Unconfirmed(Blank(3), WithBadges(20, "kill_badge"), Blank(5)));
+    }
+
+    [Fact]
+    public void Kill_Marker_without_a_Kill_Badge_is_reported_as_unconfirmed_once_its_window_closes()
+    {
+        Assert.Equal([("kill_marker_without_kill_badge", Start.AddMilliseconds(300))], Unconfirmed(Blank(3), KillMarker(2), Blank(20)));
+    }
+
+    [Fact]
+    public void Confirmed_kill_is_not_reported_as_unconfirmed()
+    {
+        Assert.Empty(Unconfirmed(Blank(3), KillMarker(2), WithBadges(20, "kill_badge"), Blank(20)));
+    }
+
     static List<GameEvent> Run(params Mat[][] segments) => RunWith(new MatchDetector(), segments);
 
     static List<GameEvent> RunWith(MatchDetector detector, params Mat[][] segments)

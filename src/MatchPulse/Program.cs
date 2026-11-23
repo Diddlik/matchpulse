@@ -42,7 +42,8 @@ static class Program
         var dispatcher = new EventDispatcher(Sinks(config, http), log);
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
-        GameWatcher.Run(config.ChecksPerSecond, () => config.GameLanguage, () => config.KillMarkerColor, TimeSpan.FromSeconds(config.HudLostAfterSeconds), dispatcher.Dispatch, log, stop.Token);
+        GameWatcher.Run(config.ChecksPerSecond, () => config.GameLanguage, () => config.KillMarkerColor, TimeSpan.FromSeconds(config.HudLostAfterSeconds), dispatcher.Dispatch, log, stop.Token,
+            diagnosticsFolder: config.Diagnostics ? DiagnosticSnapshots.DefaultFolder : null);
         dispatcher.CompleteAsync().GetAwaiter().GetResult();
         return 0;
     }
@@ -54,11 +55,16 @@ static class Program
         var dispatcher = new EventDispatcher(Sinks(config, http), log);
         var detector = new MatchDetector(log, hudLostAfter: TimeSpan.FromSeconds(config.HudLostAfterSeconds), gameLanguage: config.GameLanguage, killMarkerColor: config.KillMarkerColor);
 
+        using var snapshots = config.Diagnostics ? new DiagnosticSnapshots(DiagnosticSnapshots.DefaultFolder, log) : null;
+        if (snapshots is not null) detector.Unconfirmed += snapshots.Write;
         log.LogInformation("Replaying {Video} at {Checks} checks/s to {Count} webhook(s) and {Scripts} script(s)", video, config.ChecksPerSecond, config.Webhooks.Count, config.Scripts.Count);
         foreach (var frame in ReplayFrameSource.Read(video, DateTimeOffset.Now, config.ChecksPerSecond))
             using (frame.Image)
+            {
+                snapshots?.Add(frame);
                 foreach (var gameEvent in detector.Process(frame))
                     dispatcher.Dispatch(gameEvent);
+            }
 
         dispatcher.CompleteAsync().GetAwaiter().GetResult();
         return 0;
