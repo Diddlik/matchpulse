@@ -7,20 +7,21 @@ namespace MatchPulse.Tests;
 public sealed class UiHubTests : IDisposable
 {
     static readonly DateTimeOffset Start = new(2026, 11, 23, 20, 0, 0, TimeSpan.FromHours(1));
-    readonly string _diagnostics = Path.Combine(Path.GetTempPath(), "mp-diag-" + Guid.NewGuid().ToString("N"));
+    readonly string _data = Path.Combine(Path.GetTempPath(), "mp-data-" + Guid.NewGuid().ToString("N"));
+    string _diagnostics => Path.Combine(_data, "diagnostics");
     readonly List<(string Type, JsonNode? Payload)> _posted = [];
     Config _config = new([new Uri("http://localhost:8080/bf6")], Scripts: ["record.cmd"]);
     readonly UiHub _hub;
 
     public UiHubTests()
     {
-        _hub = new UiHub(() => _config, c => { c.Save(Path.Combine(_diagnostics, "config.json")); _config = c; }, c => [], _diagnostics);
+        _hub = new UiHub(() => _config, c => { c.Save(Path.Combine(_data, "config.json")); _config = c; }, c => [], _data);
         _hub.Post += (type, payload) => { lock (_posted) _posted.Add((type, payload)); };
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_diagnostics)) Directory.Delete(_diagnostics, true);
+        if (Directory.Exists(_data)) Directory.Delete(_data, true);
     }
 
     [Fact]
@@ -111,10 +112,39 @@ public sealed class UiHubTests : IDisposable
 
         Assert.Equal(["marker_without_skull", "skull_without_marker"], list.Select(d => (string?)d!["kind"]));
         Assert.Equal(new DateTimeOffset(new DateTime(2026, 11, 23, 12, 41, 5, 333, DateTimeKind.Local)), (DateTimeOffset)list[0]!["capturedAt"]!);
-        Assert.StartsWith("https://matchpulse.local/2026-11-23_12-41-05.333_", (string?)list[0]!["imageUrl"]);
+        Assert.StartsWith("https://matchpulse.local/diagnostics/2026-11-23_12-41-05.333_", (string?)list[0]!["imageUrl"]);
 
         _hub.Receive("""{"type":"clearDiagnostics","payload":null}""");
         Assert.Empty(_hub.Diagnostics());
+    }
+
+    [Fact]
+    public void Live_monitor_switch_saves_the_setting_and_kill_pictures_become_highlights()
+    {
+        _hub.Receive("""{"type":"setLiveMonitor","payload":{"enabled":true}}""");
+        Assert.True(_config.LiveMonitor);
+
+        var kill = new GameEvent("kill", "m1", 2, Start, new Dictionary<string, string>());
+        var path = Path.Combine(_data, "kills", KillPictures.FileName(kill, Start.AddSeconds(0.1)));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "");
+        _hub.KillPicture(kill, path);
+
+        var posted = _posted.Last(p => p.Type == "killHighlight").Payload!;
+        Assert.Equal(("m1", 2), ((string?)posted["matchId"], (int)posted["sequence"]!));
+        Assert.StartsWith("https://matchpulse.local/kills/", (string?)posted["imageUrl"]);
+        Assert.Equal(posted.ToJsonString(), Assert.Single(_hub.Snapshot()["highlights"]!.AsArray())!.ToJsonString());
+    }
+
+    [Fact]
+    public void Open_live_window_is_passed_on()
+    {
+        string? page = null;
+        _hub.WindowRequested += p => page = p;
+
+        _hub.Receive("""{"type":"openLiveWindow","payload":null}""");
+
+        Assert.Equal("live", page);
     }
 
     [Fact]

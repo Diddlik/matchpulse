@@ -18,6 +18,8 @@ Kein Framework, kein Build-Schritt, keine Netzwerkzugriffe.
 
 Seiten: Übersicht, Ereignisse, Live-Monitor, Ziele, Plugins (OBS-Steuerung, Audio-Steuerung), Einstellungen, Diagnose, Protokoll.
 
+In MatchPulse ist die Seite Plugins noch ausgeblendet (nur in der Browser-Vorschau sichtbar). Bilder kommen von `https://matchpulse.local/diagnostics/…` und `https://matchpulse.local/kills/…` (Ordner `%APPDATA%\MatchPulse`).
+
 ## Einbinden in WinForms (WebView2)
 
 ```csharp

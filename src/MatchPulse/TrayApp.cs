@@ -27,7 +27,7 @@ sealed class TrayApp : ApplicationContext
     readonly UiHub _hub;
     readonly CancellationTokenSource _stop = new();
     readonly Thread _watcher;
-    MainWindow? _window;
+    MainWindow? _window, _liveWindow;
     string _balloonPage = "status";
 
     public TrayApp(string configPath, FileLog file, ILogger log, bool showWindow = false)
@@ -35,7 +35,8 @@ sealed class TrayApp : ApplicationContext
         _configPath = configPath;
         _log = log;
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-        _hub = new UiHub(() => Config, Apply, c => Program.Sinks(c, _http), DiagnosticSnapshots.DefaultFolder);
+        _hub = new UiHub(() => Config, Apply, c => Program.Sinks(c, _http), Path.GetDirectoryName(configPath)!);
+        _hub.WindowRequested += page => _ui.Post(_ => ShowLiveWindow(), null);
         file.Written += _hub.Logged;
         try
         {
@@ -60,7 +61,7 @@ sealed class TrayApp : ApplicationContext
             {
                 Status.SetGameRunning(running);
                 _hub.SetGameRunning(running);
-            }))
+            }, _hub.KillPicture))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
         if (showWindow) ShowWindow();
@@ -96,8 +97,16 @@ sealed class TrayApp : ApplicationContext
             _window.Activate();
             return;
         }
-        _window = new MainWindow(_hub, DiagnosticSnapshots.DefaultFolder, Icons[TrayState.MatchRunning], page);
+        _window = new MainWindow(_hub, Icons[TrayState.MatchRunning], page);
         _window.Show();
+    }
+
+    // The live monitor in a window of its own, e.g. on a second screen; it never takes the focus from the game.
+    void ShowLiveWindow()
+    {
+        if (_liveWindow is { IsDisposed: false }) return;
+        _liveWindow = new MainWindow(_hub, Icons[TrayState.MatchRunning], "live", passive: true);
+        _liveWindow.Show();
     }
 
     void Notify(string key, string page)
@@ -127,6 +136,7 @@ sealed class TrayApp : ApplicationContext
     protected override void ExitThreadCore()
     {
         _window?.Close();
+        _liveWindow?.Close();
         _tray.Visible = false;
         _tray.Dispose();
         _stop.Cancel();
