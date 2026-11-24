@@ -14,3 +14,4 @@
 ## Comments
 
 Postponed by the Player on 2026-11-23. Needs a capture that spans a round end and the next round start; MatchPulse can record it live while the Player plays.
+- 2026-11-24: `samples/2026-11-24 19-58-16.mkv` holds a whole Team Deathmatch round: menu, briefing, spawn, play, defeat banner "NIEDERLAGE" at 11:44 and the end screen with "NIEDERLAGE" top right. No victory and no Conquest end yet.

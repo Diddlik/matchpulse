@@ -1,0 +1,10 @@
+{
+  "clip": "mp_kill-explosive_tdm-1124.mkv",
+  "source": { "recording": "2026-11-24 19-58-16.mkv (Team Deathmatch, multiplayer, 60 fps)", "start": 132.5, "duration": 5 },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    { "type": "kill", "offset": 2.2, "data": { "kills": "1" } }
+  ],
+  "notes": "Explosive kill on luisao69 (Kill Feed 'BulletWaltz -> luisao69'). No Kill Marker at all (scores at most 0.25); a hit popup '72' at 1.8 s, then the plain skull with 100 opens the Score Popup at 2.2 s. Offset measured on the Kill Badge."
+}

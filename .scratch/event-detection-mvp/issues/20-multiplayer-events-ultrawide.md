@@ -8,7 +8,7 @@
 
 - [ ] Recording from the Player: a Conquest round to its end with knockdowns, deaths and if possible a double kill, and a REDSEC round in 21:9 (5120x2160)
 - [ ] Multiplayer knockdown and death Cues
-- [ ] Multi-kill popup ("DOPPEL-KILL") counted as two kills
+- [x] Multi-kill popup ("DOPPEL-KILL") counted as two kills (Team Deathmatch double kill, 2026-11-24; a triple kill is not yet recorded)
 - [ ] HUD positions for other aspect ratios than 16:9
 
 ## Comments

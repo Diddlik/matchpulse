@@ -48,7 +48,7 @@ The row of icons with a point total that appears just below the crosshair while 
 _Avoid_: score display, notification
 
 **Kill Badge**:
-The skull icon in the Score Popup that appears when a kill is credited to the Player: with a tick in REDSEC, without one in regular multiplayer. It also appears when the Squad finishes an opponent the Player knocked down, so it proves a Kill only when a Kill Marker came shortly before it.
+The skull icon in the Score Popup that appears when a kill is credited to the Player: with a tick in REDSEC, without one in regular multiplayer. It also appears when the Squad finishes an opponent the Player knocked down, so it proves a Kill only when a Kill Marker came shortly before it. Exception in regular multiplayer: an explosive kill shows no Kill Marker, so there a Kill Badge that opens a Score Popup seen empty for at least 1.5 s is a Kill on its own.
 _Avoid_: skull, kill icon
 
 **Knockdown Badge**:
