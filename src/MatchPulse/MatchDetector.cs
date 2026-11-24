@@ -9,7 +9,8 @@ namespace MatchPulse;
 /// A Match starts when the in-match HUD is confirmed and ends on an end-of-match screen, or when the
 /// in-match HUD has been absent for <c>hudLostAfter</c>. Inside a Match it also reports the Player's knockdowns and
 /// death (spectating). Kills are reported everywhere; outside a Match
-/// (multiplayer) they carry no matchId and are found by the plain Kill Badge.
+/// (multiplayer) they carry no matchId and are found by the plain Kill Badge, which there also counts without a
+/// Kill Marker when it opens an empty Score Popup, and again when it is redrawn after a Kill Marker (multi-kill).
 /// </summary>
 public sealed class MatchDetector
 {
@@ -58,6 +59,13 @@ public sealed class MatchDetector
     // The Kill Marker shrinks to about a third while aiming down sights.
     static readonly double[] KillMarkerScales = [1.0, 0.7, 0.5, 0.35];
     bool _killMarkerVisible;
+
+    // Multiplayer: an explosive kill shows no Kill Marker. A Kill Badge that opens an empty Score Popup is a kill on its
+    // own there, if the popup was seen empty that long; a badge redrawn shortly after (a ribbon such as "VERGELTUNG"
+    // covering it) is not, nor one already showing when watching starts.
+    static readonly TimeSpan FreshPopupGap = TimeSpan.FromSeconds(1.5);
+    DateTimeOffset? _noKillBadgeSince;
+    DateTimeOffset _popupOpenedAt;
     readonly List<DateTimeOffset> _killMarkers = []; // not yet used for a kill; the newest one in the window is used first
 
     // REDSEC fallback for a missed Kill Badge: a kill counter flash after a Kill Marker is held
@@ -173,13 +181,21 @@ public sealed class MatchDetector
         }
         _killMarkerVisible = killMarker;
 
-        var badge = _matchId is null ? Cue.KillBadgePlain : Cue.KillBadge;
-        if (_killBadges.Update(CountBadges(frame.Image, badge, _matchId is null ? _killBadgePlain : _killBadge), frame.Timestamp) is { } rise)
+        var multiplayer = _matchId is null;
+        var badge = multiplayer ? Cue.KillBadgePlain : Cue.KillBadge;
+        var badges = CountBadges(frame.Image, badge, multiplayer ? _killBadgePlain : _killBadge);
+        if (badges == 0) _noKillBadgeSince ??= frame.Timestamp;
+        else
+        {
+            if (frame.Timestamp - _noKillBadgeSince >= FreshPopupGap) _popupOpenedAt = frame.Timestamp;
+            _noKillBadgeSince = null;
+        }
+        if (_killBadges.Update(badges, frame.Timestamp, rearmAfterDip: multiplayer) is { } rise)
         {
             var at = rise.At;
             _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", badge.Name, rise.Count, at);
             var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
-            if (marker >= 0 || _killMarkerBands is null)
+            if (marker >= 0 || _killMarkerBands is null || (multiplayer && at == _popupOpenedAt))
             {
                 DateTimeOffset? markerAt = marker >= 0 ? _killMarkers[marker] : null;
                 if (_pendingKnockdown is { } knock)
@@ -240,6 +256,7 @@ public sealed class MatchDetector
         _spectating.Reset();
         _dead = false;
         _killMarkerVisible = false;
+        _noKillBadgeSince = null;
         _killMarkers.Clear();
         _flash.Reset();
         _pendingFlash = null;
@@ -387,9 +404,11 @@ public sealed class MatchDetector
         readonly List<int> _fall = [];
 
         /// <summary>The time of the first check of a confirmed rise and the new count, once.</summary>
-        public (DateTimeOffset At, int Count)? Update(int count, DateTimeOffset at)
+        /// <param name="rearmAfterDip">The same count returning after a short dip is a rise too: in multiplayer the Score
+        /// Popup redraws its one skull in place for a further kill (multi-kill), hiding it for a few checks.</param>
+        public (DateTimeOffset At, int Count)? Update(int count, DateTimeOffset at, bool rearmAfterDip = false)
         {
-            if (count > _count)
+            if (count > _count || (rearmAfterDip && _dipped && count == _count && count > 0))
             {
                 _fall.Clear();
                 _rise.Add((at, count));
@@ -397,27 +416,37 @@ public sealed class MatchDetector
                 var confirmed = (_rise[0].At, _rise.Min(r => r.Count));
                 _count = confirmed.Item2;
                 _rise.Clear();
+                _dipped = false;
                 return confirmed;
             }
             _rise.Clear();
-            if (count == _count) _fall.Clear();
+            if (count == _count)
+            {
+                _fall.Clear();
+                _dipped = false;
+            }
             else
             {
+                _dipped = true;
                 _fall.Add(count);
                 if (_fall.Count >= KillBadgeReleaseChecks)
                 {
                     _count = _fall.Max();
                     _fall.Clear();
+                    _dipped = false;
                 }
             }
             return null;
         }
+
+        bool _dipped;
 
         public void Reset()
         {
             _count = 0;
             _rise.Clear();
             _fall.Clear();
+            _dipped = false;
         }
     }
 

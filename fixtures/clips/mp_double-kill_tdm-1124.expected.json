@@ -1,0 +1,11 @@
+{
+  "clip": "mp_double-kill_tdm-1124.mkv",
+  "source": { "recording": "2026-11-24 19-58-16.mkv (Team Deathmatch, multiplayer, 60 fps)", "start": 562.5, "duration": 6 },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    { "type": "kill", "offset": 1.2, "data": { "kills": "1" } },
+    { "type": "kill", "offset": 4.1, "data": { "kills": "2" } }
+  ],
+  "notes": "Double kill: Kill Marker at 1.2 s, plain skull with 100 (luisao69) from 1.6 s. Second Kill Marker at 4.1 s; the Score Popup redraws its one skull in place, hidden for 4 checks (4.3-4.6 s), then shows BoingFlip with 200 and 'KILLS x 2' from 4.7 s. The skull count never rises above 1."
+}

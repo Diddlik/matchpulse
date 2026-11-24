@@ -1,0 +1,10 @@
+{
+  "clip": "mp_kill-then-revenge_tdm-1124.mkv",
+  "source": { "recording": "2026-11-24 19-58-16.mkv (Team Deathmatch, multiplayer, 60 fps)", "start": 186.5, "duration": 5 },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    { "type": "kill", "offset": 1.4, "data": { "kills": "1" } }
+  ],
+  "notes": "One kill (muhkuhgoeswild): Kill Marker at 1.4 s, plain skull from 1.8 s, flickering over a slot machine until 2.1 s. A 'VERGELTUNG' ribbon then covers the popup; the skull is gone for 5 checks (2.6-3.0 s) and back at 3.1 s without a Kill Marker. Not a new kill: the Score Popup was not empty for long."
+}
