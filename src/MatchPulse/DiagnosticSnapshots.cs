@@ -6,6 +6,7 @@ namespace MatchPulse;
 /// <summary>
 /// Diagnostic mode: keeps the last 2.5 s of the screen centre (crosshair and Score Popup) and the Kill Feed, and
 /// when the Match Detector reports an unconfirmed case, writes them as one contact sheet JPEG to <paramref name="folder"/>.
+/// Only the newest <see cref="KeepFiles"/> are kept.
 /// </summary>
 public sealed class DiagnosticSnapshots(string folder, ILogger log) : IDisposable
 {
@@ -18,6 +19,8 @@ public sealed class DiagnosticSnapshots(string folder, ILogger log) : IDisposabl
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "diagnostics");
 
     static readonly TimeSpan Keep = TimeSpan.FromSeconds(2.5);
+    /// <summary>Only the newest snapshots are kept (about 0.9 MB each).</summary>
+    public const int KeepFiles = 100;
     const int Columns = 5;
     readonly Queue<(DateTimeOffset At, Mat Centre, Mat KillFeed)> _frames = new();
 
@@ -47,6 +50,7 @@ public sealed class DiagnosticSnapshots(string folder, ILogger log) : IDisposabl
             Directory.CreateDirectory(folder);
             var path = Path.Combine(folder, $"{at.ToLocalTime():yyyy-MM-dd_HH-mm-ss.fff}_{what}.jpg");
             Cv2.ImWrite(path, sheet, new ImageEncodingParam(ImwriteFlags.JpegQuality, 85));
+            foreach (var old in Directory.GetFiles(folder, "*.jpg").OrderDescending().Skip(KeepFiles)) File.Delete(old);
             log.LogInformation("Diagnostic snapshot {Path}", path);
         }
         catch (Exception e)
