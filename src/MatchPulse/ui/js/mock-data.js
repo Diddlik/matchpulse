@@ -39,9 +39,13 @@
         rules: [] },
       { id: 'homeassistant', enabled: true, status: 'connected', lastError: null,
         config: { discoveryPrefix: 'homeassistant', topicPrefix: 'matchpulse', mqttEnabled: true }, rules: [] },
-      { id: 'wled', enabled: true, status: 'connected', lastError: null, config: { host: '192.168.1.50' },
-        rules: [ { id: 'w1', event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 },
-                 { id: 'w2', event: 'match_ended', action: 'preset', color: '#FF0000', effect: 'solid', durationSeconds: 1.5, preset: 3 } ] },
+      { id: 'wled', enabled: true, status: 'connected', lastError: null, config: {}, rules: [],
+        devices: [
+          { id: 'd1', name: 'Desk', host: '192.168.1.50', status: 'connected', lastError: null,
+            rules: [ { id: 'w1', event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 },
+                     { id: 'w2', event: 'match_ended', action: 'preset', color: '#FF0000', effect: 'solid', durationSeconds: 1.5, preset: 3 } ] },
+          { id: 'd2', name: 'Shelf', host: '192.168.1.51', status: 'connected', lastError: null,
+            rules: [ { id: 'w3', event: 'death', action: 'color', color: '#0000FF', effect: 'solid', durationSeconds: 1.5, preset: 1 } ] } ] },
       { id: 'sound', enabled: true, status: 'ready', lastError: null, config: {},
         rules: [ { id: 's1', event: 'kill', sound: 'ding', volume: 70 }, { id: 's2', event: 'death', sound: 'low', volume: 60 } ] }
 

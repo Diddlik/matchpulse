@@ -1,14 +1,30 @@
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace MatchPulse;
 
-/// <summary>WLED plugin: lights from a WLED controller react to Game Events through its JSON API (<c>/json/state</c>).</summary>
-public sealed record WledSettings(bool Enabled = false, string Host = "", IReadOnlyList<WledRule>? Rules = null)
+/// <summary>WLED plugin: lights from WLED controllers react to Game Events through their JSON API (<c>/json/state</c>).</summary>
+public sealed record WledSettings(bool Enabled = false, IReadOnlyList<WledDevice>? Devices = null)
 {
     public static readonly string[] Actions = ["flash", "preset", "color", "on", "off"];
     public static readonly string[] Effects = ["solid", "blink", "strobe"];
 
+    public IReadOnlyList<WledDevice> Devices { get; init; } = Devices ?? [];
+
+    // Up to 0.4.1 there was one controller ("host" and "rules"); an old config loads it as the first device.
+    WledDevice First => Devices.FirstOrDefault() ?? new WledDevice("wled", "WLED", "");
+
+    [JsonPropertyName("host"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyHost { get => null; init { if (value is not null) Devices = [First with { Host = value }, .. Devices.Skip(1)]; } }
+
+    [JsonPropertyName("rules"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<WledRule>? LegacyRules { get => null; init { if (value is { Count: > 0 }) Devices = [First with { Rules = value }, .. Devices.Skip(1)]; } }
+}
+
+/// <summary>One WLED controller and its own rules.</summary>
+public sealed record WledDevice(string Id, string Name, string Host, IReadOnlyList<WledRule>? Rules = null)
+{
     public IReadOnlyList<WledRule> Rules { get; init; } = Rules ?? [];
 }
 
@@ -22,15 +38,15 @@ public sealed record WledRule(string Id, string Event, string Action, string Col
 /// Sends the matching WLED rules for each Game Event. A flash saves the current state first and restores it afterwards,
 /// in the background, so the next Game Event is not held up; a newer flash takes over the restore of the one before.
 /// </summary>
-public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEventSink, Exception?>? later = null) : IEventSink
+public sealed class WledSink(HttpClient http, WledDevice device, Action<IEventSink, Exception?>? later = null) : IEventSink
 {
     static readonly Dictionary<string, int> EffectIds = new() { ["solid"] = 0, ["blink"] = 1, ["strobe"] = 23 };
     JsonNode? _restore; // the state before the running flash
     int _flash;         // which flash may restore
 
-    public WledSettings Settings => settings;
+    public WledDevice Device => device;
 
-    string Url => BaseUrl(settings.Host);
+    string Url => BaseUrl(device.Host);
 
     /// <summary>"192.168.1.50", "http://192.168.1.50/" or "wled.local" all become "http://host/json".</summary>
     static string BaseUrl(string host)
@@ -43,14 +59,14 @@ public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEve
 
     public async Task SendAsync(GameEvent gameEvent, CancellationToken cancellationToken)
     {
-        foreach (var rule in settings.Rules.Where(r => r.Event == gameEvent.Type))
+        foreach (var rule in device.Rules.Where(r => r.Event == gameEvent.Type))
             await RunAsync(rule, cancellationToken);
     }
 
     /// <summary>Asks the controller for its name and version; throws when it cannot be reached.</summary>
-    public static async Task<string> TestAsync(HttpClient http, WledSettings settings, CancellationToken cancellationToken)
+    public static async Task<string> TestAsync(HttpClient http, string host, CancellationToken cancellationToken)
     {
-        var info = await http.GetFromJsonAsync<JsonObject>($"{BaseUrl(settings.Host)}/info", cancellationToken);
+        var info = await http.GetFromJsonAsync<JsonObject>($"{BaseUrl(host)}/info", cancellationToken);
         return $"{(string?)info?["name"] ?? "WLED"} {(string?)info?["ver"]}".Trim();
     }
 
@@ -131,5 +147,5 @@ public sealed class WledSink(HttpClient http, WledSettings settings, Action<IEve
             throw new HttpRequestException($"WLED answered {(int)response.StatusCode} {response.ReasonPhrase}.", null, response.StatusCode);
     }
 
-    public override string ToString() => $"WLED {settings.Host}";
+    public override string ToString() => $"WLED {device.Name} ({device.Host})";
 }
