@@ -316,16 +316,19 @@
               </div>
               ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
-            </div>` : p.id === 'wled' ? `
+            </div>` : p.id === 'wled' ? (() => { const d = wlDev(p); return `
             <div class="stack" style="gap:12px">
-              <h3>${esc(t('wl_conn'))}</h3>
-              <div class="row-flex" style="align-items:flex-end">
-                <label class="field" style="flex:1 1 260px"><span>${esc(t('wl_host'))}</span><input class="input mono" type="text" placeholder="192.168.1.50" value="${esc(p.config.host)}" data-change="wl" data-key="host"></label>
+              <div class="row-flex"><h3 class="grow">${esc(t('wl_devices'))}</h3><button type="button" class="btn s" data-act="addWlDev">${esc(t('wl_add_device'))}</button></div>
+              ${p.devices.length ? `<div class="row-flex" style="gap:8px">${p.devices.map((x) => `<button type="button" class="btn s" aria-pressed="${x === d}" style="${x === d ? 'border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)' : ''}" data-act="wlDevSel" data-arg="${esc(x.id)}"><span class="status-text ${p.enabled ? plugCls(x.status) : 'st-idle'}" style="font-weight:inherit"><span class="dot"></span>${esc(x.name || x.host || 'WLED')}</span></button>`).join('')}</div>` : `<p class="small muted">${esc(t('wl_no_devices'))}</p>`}
+              ${d ? `<div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:1 1 160px"><span>${esc(t('wl_name'))}</span><input class="input" type="text" placeholder="WLED" value="${esc(d.name)}" data-change="wl" data-key="name"></label>
+                <label class="field" style="flex:1 1 220px"><span>${esc(t('wl_host'))}</span><input class="input mono" type="text" placeholder="192.168.1.50" value="${esc(d.host)}" data-change="wl" data-key="host"></label>
                 <button type="button" class="btn" data-act="testPlugin" data-arg="wled">${esc(t('obs_test'))}</button>
+                <button type="button" class="btn danger" data-act="removeWlDev">${esc(t('remove'))}</button>
               </div>
-              ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('wl_err'))}</div>` : ''}
+              ${p.enabled && (d.status === 'error' || d.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(d.lastError || t('wl_err'))}</div>` : ''}` : ''}
               <span class="small muted">${esc(t('wl_hint'))}</span>
-            </div>` : p.id === 'sound' ? `
+            </div>`; })() : p.id === 'sound' ? `
             <div class="stack" style="gap:12px">
               <span class="small muted">${esc(t('so_hint'))}</span>
               ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || '')}</div>` : ''}
@@ -384,9 +387,9 @@
               </div>
               <label class="row-flex" style="gap:10px;min-height:40px;flex-wrap:nowrap"><input class="check" type="checkbox" ${p.config.restoreOnExit ? 'checked' : ''} data-change="restoreOnExit"><span>${esc(t('au_restore'))}</span></label>
             </div>`}
-          ${p.id === 'mqtt' || p.id === 'homeassistant' ? `<span class="small muted">${esc(t('pl_apply'))}</span>` : `<div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
-            <div class="row-flex"><h3 class="grow">${esc(t('pl_rules'))}</h3><button type="button" class="btn s" data-act="addRule">${esc(t('pl_add_rule'))}</button></div>
-            ${p.rules.map((r) => `
+          ${p.id === 'mqtt' || p.id === 'homeassistant' || (p.id === 'wled' && !wlDev(p)) ? `<span class="small muted">${esc(t('pl_apply'))}</span>` : `<div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
+            <div class="row-flex"><h3 class="grow">${esc(p.id === 'wled' ? t('wl_rules_of', { n: wlDev(p).name || wlDev(p).host || 'WLED' }) : t('pl_rules'))}</h3><button type="button" class="btn s" data-act="addRule">${esc(t('pl_add_rule'))}</button></div>
+            ${rulesOf(p).map((r) => `
               <div class="rule">
                 <span class="small muted" style="width:40px">${esc(t('pl_when'))}</span>
                 <select class="select" aria-label="${esc(t('pl_event'))}" data-change="ruleEvent" data-id="${esc(r.id)}">${['match_started', 'kill', 'knockdown', 'death', 'match_ended'].map((e) => `<option value="${e}" ${r.event === e ? 'selected' : ''}>${esc(t('ev_' + e))}</option>`).join('')}</select>
@@ -574,6 +577,9 @@
 
   // ---------- Aktionen ----------
   const curPlug = () => S.plugins.find((x) => x.id === S.plugSel) || S.plugins[0];
+  const wlDev = (p) => p.devices.find((d) => d.id === S.wlDev) || p.devices[0];
+  // WLED keeps the rules per device: the selected device's.
+  const rulesOf = (p) => (p.id === 'wled' ? (wlDev(p) || { rules: [] }).rules : p.rules);
   const savePlug = (p) => { S.plugins = S.plugins.map((x) => (x.id === p.id ? p : x)); B.send('savePlugin', p); };
   const editPlug = (fn, id) => { const p = clone(id ? S.plugins.find((x) => x.id === id) : curPlug()); fn(p); savePlug(p); };
   const saveSinks = () => B.send('saveSinks', S.sinks);
@@ -609,14 +615,17 @@
     },
     plugSel: (id) => { S.plugSel = id; },
     plugOn: (id) => editPlug((p) => { p.enabled = true; }, id),
-    testPlugin: (id) => B.send('testPlugin', { id }),
+    testPlugin: (id) => B.send('testPlugin', id === 'wled' ? { id, device: wlDev(curPlug()).id } : { id }),
+    wlDevSel: (id) => { S.wlDev = id; },
+    addWlDev: () => { const id = uid('d'); editPlug((p) => { p.devices.push({ id, name: 'WLED ' + (p.devices.length + 1), host: '', status: 'disconnected', lastError: null, rules: [] }); }, 'wled'); S.wlDev = id; },
+    removeWlDev: () => editPlug((p) => { const d = wlDev(p); p.devices = p.devices.filter((x) => x.id !== d.id); S.wlDev = null; }, 'wled'),
     addApp: () => { const n = S.newApp.trim(); if (!n) return; editPlug((p) => { p.config.apps.push({ name: n, volume: 30 }); }); S.newApp = ''; },
     removeApp: (i) => editPlug((p) => { p.config.apps.splice(Number(i), 1); }),
-    addRule: () => editPlug((p) => { p.rules.push(p.id === 'wled' ? { id: uid('r'), event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 }
+    addRule: () => editPlug((p) => { rulesOf(p).push(p.id === 'wled' ? { id: uid('r'), event: 'kill', action: 'flash', color: '#FF0000', effect: 'blink', durationSeconds: 1.5, preset: 1 }
       : p.id === 'sound' ? { id: uid('r'), event: 'kill', sound: 'ding', volume: 80 }
       : { id: uid('r'), event: 'kill', action: p.id === 'obs' ? 'save_replay' : 'duck', param: '', text: '', delaySeconds: 0, durationSeconds: 0 }); }),
     testRule: (id) => B.send('testRule', { id: curPlug().id, ruleId: id }),
-    removeRule: (id) => editPlug((p) => { p.rules = p.rules.filter((r) => r.id !== id); }),
+    removeRule: (id) => editPlug((p) => { const rules = rulesOf(p); rules.splice(rules.findIndex((r) => r.id === id), 1); }),
     liveOn: () => { S.settings.liveMonitor = true; S.draft.liveMonitor = true; S.liveIdx = -1; B.send('setLiveMonitor', { enabled: true }); },
     liveStep: (d) => { const n = S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : true)).length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
     liveIdx: (i) => { S.liveIdx = Number(i); },
@@ -657,23 +666,23 @@
     mq: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.dataset.key === 'password' ? v : v.trim(); }, 'mqtt'),
     mqNum: (v, el) => editPlug((p) => { p.config[el.dataset.key] = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'mqtt'),
     ha: (v, el) => editPlug((p) => { p.config[el.dataset.key] = v.trim(); }, 'homeassistant'),
-    wl: (v, el) => editPlug((p) => { p.config[el.dataset.key] = v.trim(); }, 'wled'),
-    wlColor: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).color = v.toUpperCase(); }, 'wled'),
-    wlEffect: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).effect = v; }, 'wled'),
-    wlDuration: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).durationSeconds = Math.min(30, Math.max(0.1, Number(v) || 1.5)); }, 'wled'),
-    wlPreset: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).preset = Math.min(250, Math.max(1, Math.round(Number(v) || 1))); }, 'wled'),
+    wl: (v, el) => editPlug((p) => { wlDev(p)[el.dataset.key] = v.trim(); }, 'wled'),
+    wlColor: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).color = v.toUpperCase(); }, 'wled'),
+    wlEffect: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).effect = v; }, 'wled'),
+    wlDuration: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).durationSeconds = Math.min(30, Math.max(0.1, Number(v) || 1.5)); }, 'wled'),
+    wlPreset: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).preset = Math.min(250, Math.max(1, Math.round(Number(v) || 1))); }, 'wled'),
     soSound: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).sound = v; }, 'sound'),
     soFile: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).sound = v.trim().replace(/^"|"$/g, '') || 'file'; }, 'sound'),
     soVolume: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).volume = Number(v); }, 'sound'),
     mqBool: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.checked; }, 'mqtt'),
     appVol: (v, el) => editPlug((p) => { p.config.apps[Number(el.dataset.idx)].volume = Number(v); }),
     restoreOnExit: (v, el) => editPlug((p) => { p.config.restoreOnExit = el.checked; }),
-    ruleEvent: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).event = v; }),
-    ruleAction: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).action = v; }),
-    ruleParam: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).param = v; }),
-    ruleText: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).text = v; }),
-    ruleDelay: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).delaySeconds = Math.min(60, Math.max(0, Number(v) || 0)); }),
-    ruleDuration: (v, el) => editPlug((p) => { p.rules.find((r) => r.id === el.dataset.id).durationSeconds = Math.min(60, Math.max(0, Number(v) || 0)); })
+    ruleEvent: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).event = v; }),
+    ruleAction: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).action = v; }),
+    ruleParam: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).param = v; }),
+    ruleText: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).text = v; }),
+    ruleDelay: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).delaySeconds = Math.min(60, Math.max(0, Number(v) || 0)); }),
+    ruleDuration: (v, el) => editPlug((p) => { rulesOf(p).find((r) => r.id === el.dataset.id).durationSeconds = Math.min(60, Math.max(0, Number(v) || 0)); })
   };
   const INP = {
     editDraft: (v) => { S.editDraft = v; },
@@ -736,7 +745,8 @@
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },
-    pluginStatus: ({ id, status, lastError }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null }) : p)); if (status !== 'error' && id !== 'sound') toast(t(id === 'obs' ? 'obs_ok' : id === 'homeassistant' ? 'ha_ok' : id === 'wled' ? 'wl_ok' : 'mq_ok')); },
+    pluginStatus: ({ id, status, lastError, devices }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null },
+      devices && p.devices ? { devices: p.devices.map((d) => Object.assign({}, d, devices[d.id] || {})) } : {}) : p)); if (status !== 'error' && id !== 'sound') toast(t(id === 'obs' ? 'obs_ok' : id === 'homeassistant' ? 'ha_ok' : id === 'wled' ? 'wl_ok' : 'mq_ok')); },
     settings: (s) => { const wasDirty = dirty(); S.settings = s; if (!wasDirty) { S.draft = clone(s); S.hexDraft = s.killMarkerColor; } },
     diagnostics: (list) => { S.diagnostics = list; },
     hostProblems: (list) => { S.hostProblems = list; },

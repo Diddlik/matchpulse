@@ -32,6 +32,7 @@ public sealed class UiHub : IEventSink
     JsonObject? _match;
     readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null), ["homeassistant"] = ("disconnected", null),
         ["wled"] = ("disconnected", null), ["sound"] = ("ready", null) };
+    readonly Dictionary<string, (string Status, string? Error)> _wled = []; // per WLED device id; "wled" above is the worst of them
     static readonly HttpClient PluginHttp = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     sealed record SinkHealth(DateTimeOffset? LastSuccessAt, DateTimeOffset? LastFailureAt, string? Code, string? Message);
@@ -123,7 +124,7 @@ public sealed class UiHub : IEventSink
     public void Delivered(IEventSink sink, Exception? error)
     {
         if (sink is ObsSink) { PluginResult("obs", error); return; }
-        if (sink is WledSink) { PluginResult("wled", error); return; }
+        if (sink is WledSink wled) { PluginResult("wled", error, wled.Device.Id); return; }
         if (sink is SoundSink) { PluginResult("sound", error); return; }
         if (sink is MqttSink mqtt)
         {
@@ -206,7 +207,7 @@ public sealed class UiHub : IEventSink
             case "savePlugin" when (string?)payload!["id"] == "homeassistant": Apply(_config() with { HomeAssistant = HomeAssistantFrom(payload!.AsObject()) }); break;
             case "testPlugin" when (string?)payload!["id"] == "homeassistant": _ = TestHomeAssistantAsync(_config()); break;
             case "savePlugin" when (string?)payload!["id"] == "wled": Apply(_config() with { Wled = WledFrom(payload!.AsObject()) }); break;
-            case "testPlugin" when (string?)payload!["id"] == "wled": _ = TestWledAsync(_config().Wled); break;
+            case "testPlugin" when (string?)payload!["id"] == "wled": _ = TestWledAsync((string?)payload["device"]); break;
             case "savePlugin" when (string?)payload!["id"] == "sound": Apply(_config() with { Sound = SoundFrom(payload!.AsObject()) }); break;
             case "testRule": _ = TestRuleAsync((string?)payload!["id"], (string?)payload["ruleId"]); break;
             case "setActive": Apply(_config() with { Active = (bool?)payload!["active"] ?? true }); break;
@@ -348,18 +349,45 @@ public sealed class UiHub : IEventSink
 
     // ---------- WLED and sound plugins ----------
 
-    async Task TestWledAsync(WledSettings settings)
+    /// <summary>The Test button of one device (or of all when <paramref name="deviceId"/> is null).</summary>
+    async Task TestWledAsync(string? deviceId)
     {
-        try
+        foreach (var device in _config().Wled.Devices.Where(d => deviceId is null || d.Id == deviceId))
+            try
+            {
+                var name = await WledSink.TestAsync(PluginHttp, device.Host, CancellationToken.None);
+                Logged(DateTimeOffset.Now, LogLevel.Information, $"WLED {name} reached at {device.Host}");
+                PluginResult("wled", null, device.Id);
+            }
+            catch (Exception e)
+            {
+                Logged(DateTimeOffset.Now, LogLevel.Warning, $"WLED test at {device.Host} failed: {e.Message}");
+                PluginResult("wled", e, device.Id);
+            }
+    }
+
+    /// <summary>Periodic reachability check (WLED has no open connection to watch). Reports only changes.</summary>
+    public async Task CheckWledAsync()
+    {
+        var settings = _config().Wled;
+        if (!settings.Enabled) return;
+        foreach (var device in settings.Devices.Where(d => d.Host != ""))
         {
-            var name = await WledSink.TestAsync(PluginHttp, settings, CancellationToken.None);
-            Logged(DateTimeOffset.Now, LogLevel.Information, $"WLED {name} reached at {settings.Host}");
-            PluginResult("wled", null);
-        }
-        catch (Exception e)
-        {
-            Logged(DateTimeOffset.Now, LogLevel.Warning, $"WLED test at {settings.Host} failed: {e.Message}");
-            PluginResult("wled", e);
+            string? before;
+            lock (_lock) before = _wled.GetValueOrDefault(device.Id).Status;
+            try
+            {
+                await WledSink.TestAsync(PluginHttp, device.Host, CancellationToken.None);
+                if (before is "connected" or "ruleFailed") continue; // keep a failed rule visible
+                Logged(DateTimeOffset.Now, LogLevel.Information, $"WLED {device.Name} reached at {device.Host}");
+                PluginResult("wled", null, device.Id);
+            }
+            catch (Exception e)
+            {
+                if (before == "error") continue;
+                Logged(DateTimeOffset.Now, LogLevel.Warning, $"WLED {device.Name} at {device.Host} not reachable: {e.Message}");
+                PluginResult("wled", e, device.Id);
+            }
         }
     }
 
@@ -367,19 +395,23 @@ public sealed class UiHub : IEventSink
     async Task TestRuleAsync(string? plugin, string? ruleId)
     {
         var config = _config();
+        string? deviceId = null;
         try
         {
             if (plugin == "sound" && config.Sound.Rules.FirstOrDefault(r => r.Id == ruleId) is { } sound)
                 SoundSink.Play(sound.Sound, Math.Clamp(sound.Volume, 0, 100) / 100f);
-            else if (plugin == "wled" && config.Wled.Rules.FirstOrDefault(r => r.Id == ruleId) is { } wled)
-                await new WledSink(PluginHttp, config.Wled, (_, e) => PluginResult("wled", e)).RunAsync(wled, CancellationToken.None);
+            else if (plugin == "wled" && config.Wled.Devices.FirstOrDefault(d => d.Rules.Any(r => r.Id == ruleId)) is { } device)
+            {
+                deviceId = device.Id;
+                await new WledSink(PluginHttp, device, (_, e) => PluginResult("wled", e, device.Id)).RunAsync(device.Rules.First(r => r.Id == ruleId), CancellationToken.None);
+            }
             else return;
-            PluginResult(plugin, null);
+            PluginResult(plugin, null, deviceId);
         }
         catch (Exception e)
         {
             Logged(DateTimeOffset.Now, LogLevel.Warning, $"{plugin} rule test failed: {e.Message}");
-            PluginResult(plugin, e);
+            PluginResult(plugin, e, deviceId);
         }
     }
 
@@ -392,12 +424,19 @@ public sealed class UiHub : IEventSink
                 ["enabled"] = w.Enabled,
                 ["status"] = _plugins["wled"].Status,
                 ["lastError"] = _plugins["wled"].Error,
-                ["config"] = new JsonObject { ["host"] = w.Host },
-                ["rules"] = new JsonArray([.. w.Rules.Select(r => (JsonNode)new JsonObject
+                ["config"] = new JsonObject(),
+                ["devices"] = new JsonArray([.. w.Devices.Select(d => (JsonNode)new JsonObject
                 {
-                    ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["color"] = r.Color,
-                    ["effect"] = r.Effect, ["durationSeconds"] = r.DurationSeconds, ["preset"] = r.Preset,
+                    ["id"] = d.Id, ["name"] = d.Name, ["host"] = d.Host,
+                    ["status"] = _wled.GetValueOrDefault(d.Id).Status ?? "disconnected",
+                    ["lastError"] = _wled.GetValueOrDefault(d.Id).Error,
+                    ["rules"] = new JsonArray([.. d.Rules.Select(r => (JsonNode)new JsonObject
+                    {
+                        ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["color"] = r.Color,
+                        ["effect"] = r.Effect, ["durationSeconds"] = r.DurationSeconds, ["preset"] = r.Preset,
+                    })]),
                 })]),
+                ["rules"] = new JsonArray(),
             };
     }
 
@@ -417,30 +456,43 @@ public sealed class UiHub : IEventSink
 
     public static WledSettings WledFrom(JsonObject p) => new(
         (bool?)p["enabled"] ?? false,
-        ((string?)p["config"]?["host"] ?? "").Trim(),
-        [.. p["rules"]!.AsArray().Select(r => new WledRule(
-            (string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "",
-            ((string?)r["color"] ?? "#FF0000").ToUpperInvariant(), (string?)r["effect"] ?? "blink",
-            (double?)r["durationSeconds"] ?? 1.5, (int?)r["preset"] ?? 1))]);
+        [.. (p["devices"]?.AsArray() ?? []).Select(d => new WledDevice(
+            (string?)d!["id"] ?? Guid.NewGuid().ToString("N"), ((string?)d["name"] ?? "").Trim(), ((string?)d["host"] ?? "").Trim(),
+            [.. (d["rules"]?.AsArray() ?? []).Select(r => new WledRule(
+                (string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "",
+                ((string?)r["color"] ?? "#FF0000").ToUpperInvariant(), (string?)r["effect"] ?? "blink",
+                (double?)r["durationSeconds"] ?? 1.5, (int?)r["preset"] ?? 1))]))]);
 
     public static SoundSettings SoundFrom(JsonObject p) => new(
         (bool?)p["enabled"] ?? false,
         [.. p["rules"]!.AsArray().Select(r => new SoundRule(
             (string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", ((string?)r["sound"] ?? "ding").Trim().Trim('"'), (int?)r["volume"] ?? 80))]);
 
-    void PluginResult(string id, Exception? error)
+    /// <param name="device">The WLED device the result is for; the plugin's status is then the worst of its devices.</param>
+    void PluginResult(string id, Exception? error, string? device = null)
     {
         bool newFailure;
         (string Status, string? Error) state;
+        JsonObject? devices = null;
         lock (_lock)
         {
-            newFailure = error is not null && _plugins[id].Status != "error";
+            newFailure = error is not null && (device is null ? _plugins[id].Status : _wled.GetValueOrDefault(device).Status) != "error";
             // Reached, but a rule failed (OBS answered with an error code, WLED with an HTTP status): not a connection problem.
             var ruleFailed = error is ObsException { Code: not null } or HttpRequestException { StatusCode: not null };
-            state = _plugins[id] = (error is null ? (id == "sound" ? "ready" : "connected") : ruleFailed ? "ruleFailed" : "error",
+            state = (error is null ? (id == "sound" ? "ready" : "connected") : ruleFailed ? "ruleFailed" : "error",
                 error is null ? null : PluginMessage(id, error));
+            if (device is null) _plugins[id] = state;
+            else
+            {
+                _wled[device] = state;
+                var all = _config().Wled.Devices.Select(d => (d.Name, State: _wled.GetValueOrDefault(d.Id))).ToList();
+                var bad = all.Where(d => d.State.Status is "error" or "ruleFailed").OrderBy(d => d.State.Status).FirstOrDefault(); // "error" first
+                state = _plugins[id] = bad.Name is not null ? (bad.State.Status, $"{bad.Name}: {bad.State.Error}")
+                    : (all.Count > 0 && all.All(d => d.State.Status == "connected") ? "connected" : "disconnected", null);
+                devices = new JsonObject([.. _wled.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)new JsonObject { ["status"] = kv.Value.Status, ["lastError"] = kv.Value.Error }))]);
+            }
         }
-        Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error });
+        Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error, ["devices"] = devices });
         if (newFailure && id != "homeassistant")
             Problem?.Invoke(id switch { "obs" => "ObsFailed", "mqtt" => "MqttFailed", "wled" => "WledFailed", _ => "SoundFailed" }, "plugins");
     }

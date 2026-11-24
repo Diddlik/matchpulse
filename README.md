@@ -141,7 +141,7 @@ Every rule can wait a few seconds first — for example, save the replay buffer 
 
 ## WLED and sound
 
-**WLED** — enter the address of your WLED controller under **Plugins → WLED** and add rules: *flash* a colour (solid, blink or strobe) for a moment, *load a preset*, *set a colour*, or turn the lights *on* or *off*. After a flash MatchPulse puts the lights back the way they were; several kills in a row restore the state from before the first.
+**WLED** — under **Plugins → WLED**, add one or more WLED controllers (name and address). Each controller has its own rules: *flash* a colour (solid, blink or strobe) for a moment, *load a preset*, *set a colour*, or turn the lights *on* or *off*. After a flash MatchPulse puts the lights back the way they were; several kills in a row restore the state from before the first.
 
 **Sound** — under **Plugins → Sound**, pick a built-in sound (ding, double ding, low tone, fanfare) or your own WAV or MP3 file for any event, with its own volume. Sounds play on the Windows default output device without holding anything up; ▶ next to each rule plays it as a test.
 

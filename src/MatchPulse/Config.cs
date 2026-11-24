@@ -94,7 +94,9 @@ public sealed record Config(
             throw new InvalidDataException($"{path}: the MQTT topic prefix must not be empty, contain # or +, or end with /.");
         if (string.IsNullOrWhiteSpace(HomeAssistant.DiscoveryPrefix) || HomeAssistant.DiscoveryPrefix.IndexOfAny(['#', '+']) >= 0 || HomeAssistant.DiscoveryPrefix.EndsWith('/'))
             throw new InvalidDataException($"{path}: the Home Assistant discovery prefix must not be empty, contain # or +, or end with /.");
-        if (Wled.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || !WledSettings.Actions.Contains(r.Action) || !WledSettings.Effects.Contains(r.Effect)
+        if (Wled.Devices.Any(d => d is null || string.IsNullOrWhiteSpace(d.Id)) || Wled.Devices.DistinctBy(d => d.Id).Count() != Wled.Devices.Count)
+            throw new InvalidDataException($"{path}: each WLED device needs its own id.");
+        if (Wled.Devices.SelectMany(d => d.Rules).Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || !WledSettings.Actions.Contains(r.Action) || !WledSettings.Effects.Contains(r.Effect)
                 || !Regex.IsMatch(r.Color ?? "", "^#[0-9A-Fa-f]{6}$") || r.DurationSeconds is < 0.1 or > 30 || r.Preset is < 1 or > 250))
             throw new InvalidDataException($"{path}: a WLED rule has an unknown event, action or effect, a colour not like #FF0000, a flash outside 0.1-30 s or a preset outside 1-250.");
         if (Sound.Rules.Any(r => r is null || !ObsSettings.Events.Contains(r.Event) || string.IsNullOrWhiteSpace(r.Sound) || r.Volume is < 0 or > 100))

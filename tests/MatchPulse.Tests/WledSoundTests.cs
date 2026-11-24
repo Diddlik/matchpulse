@@ -9,7 +9,7 @@ public sealed class WledSoundTests
     static readonly DateTimeOffset Start = new(2026, 11, 23, 20, 0, 0, TimeSpan.FromHours(1));
     static GameEvent Event(string type) => new(type, "m1", 2, Start, new Dictionary<string, string>());
 
-    static WledSettings Wled(params WledRule[] rules) => new(true, "192.168.1.50", rules);
+    static WledDevice Wled(params WledRule[] rules) => new("d1", "Desk", "192.168.1.50", rules);
 
     [Fact]
     public async Task Flash_shows_the_colour_and_restores_the_lights_afterwards()
@@ -62,7 +62,7 @@ public sealed class WledSoundTests
     public async Task Address_with_scheme_and_slash_is_accepted()
     {
         var controller = new Controller();
-        var sink = new WledSink(new HttpClient(controller), new WledSettings(true, " http://192.168.1.50/ ", [new WledRule("r1", "kill", "on")]));
+        var sink = new WledSink(new HttpClient(controller), new WledDevice("d1", "Desk", " http://192.168.1.50/ ", [new WledRule("r1", "kill", "on")]));
 
         await sink.SendAsync(Event("kill"), default);
 
@@ -103,12 +103,31 @@ public sealed class WledSoundTests
     [Fact]
     public void Plugins_from_the_window_map_to_their_settings()
     {
-        var wled = JsonNode.Parse("""{"id":"wled","enabled":true,"config":{"host":" 192.168.1.50 "},"rules":[{"id":"r1","event":"kill","action":"flash","color":"#ff0000","effect":"blink","durationSeconds":1.5,"preset":1}]}""")!.AsObject();
+        var wled = JsonNode.Parse("""{"id":"wled","enabled":true,"config":{},"devices":[{"id":"d1","name":" Desk ","host":" 192.168.1.50 ","rules":[{"id":"r1","event":"kill","action":"flash","color":"#ff0000","effect":"blink","durationSeconds":1.5,"preset":1}]}],"rules":[]}""")!.AsObject();
         var sound = JsonNode.Parse("""{"id":"sound","enabled":true,"config":{},"rules":[{"id":"s1","event":"death","sound":" \"C:\\Sounds\\x.mp3\" ","volume":40}]}""")!.AsObject();
 
-        Assert.Equal(new WledRule("r1", "kill", "flash", "#FF0000", "blink", 1.5, 1), Assert.Single(UiHub.WledFrom(wled).Rules));
-        Assert.Equal("192.168.1.50", UiHub.WledFrom(wled).Host);
+        var device = Assert.Single(UiHub.WledFrom(wled).Devices);
+        Assert.Equal(("d1", "Desk", "192.168.1.50"), (device.Id, device.Name, device.Host));
+        Assert.Equal(new WledRule("r1", "kill", "flash", "#FF0000", "blink", 1.5, 1), Assert.Single(device.Rules));
         Assert.Equal(new SoundRule("s1", "death", @"C:\Sounds\x.mp3", 40), Assert.Single(UiHub.SoundFrom(sound).Rules));
+    }
+
+    [Fact]
+    public void Old_config_with_one_controller_loads_as_the_first_device_and_saves_as_devices()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"matchpulse-wled-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, """{"webhooks":[],"wled":{"enabled":true,"host":"192.168.1.50","rules":[{"id":"r1","event":"kill","action":"on"}]}}""");
+            var device = Assert.Single(Config.Load(path).Wled.Devices);
+            Assert.Equal(("192.168.1.50", "r1"), (device.Host, Assert.Single(device.Rules).Id));
+
+            Config.Load(path).Save(path);
+            var wled = JsonNode.Parse(File.ReadAllText(path))!["wled"]!.AsObject();
+            Assert.False(wled.ContainsKey("host") || wled.ContainsKey("rules"));
+            Assert.Equal("192.168.1.50", Assert.Single(Config.Load(path).Wled.Devices).Host);
+        }
+        finally { File.Delete(path); }
     }
 
     /// <summary>A WLED controller: GET /json/state returns a warm white state, POSTs are recorded.</summary>

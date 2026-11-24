@@ -87,7 +87,7 @@ static class Program
             .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
             .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs, later)] : Array.Empty<IEventSink>(),
             .. config.Mqtt.Enabled ? [new MqttSink(config.Mqtt, config.HomeAssistant, later)] : Array.Empty<IEventSink>(),
-            .. config.Wled is { Enabled: true, Rules.Count: > 0 } && config.Wled.Host.Trim() is not "" ? [new WledSink(http, config.Wled, later)] : Array.Empty<IEventSink>(),
+            .. config.Wled.Enabled ? config.Wled.Devices.Where(d => d.Rules.Count > 0 && d.Host.Trim() != "").Select(d => new WledSink(http, d, later)) : [],
             .. config.Sound is { Enabled: true, Rules.Count: > 0 } ? [new SoundSink(config.Sound)] : Array.Empty<IEventSink>(),
         ];
 
