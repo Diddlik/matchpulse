@@ -33,6 +33,8 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
+; MatchPulse does not start while this exists, so it cannot lock files mid-update (Program.SetupRunning).
+SetupMutex=MatchPulseSetup,Global\MatchPulseSetup
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
@@ -51,10 +53,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-[InstallDelete]
-; Files of an older version that the new one no longer ships.
-Type: filesandordirs; Name: "{app}\ui"
-Type: filesandordirs; Name: "{app}\cues"
+; No [InstallDelete] of ui and cues: an aborted update rolls back the files it created, so deleting the folders
+; first left MatchPulse without them (2026-11-24). A file an older version shipped and this one does not stays unused.
 
 [Icons]
 ; Created only when missing: an update keeps existing shortcuts as they are (place on the desktop, own icon or
