@@ -47,7 +47,8 @@
           { id: 'd2', name: 'Shelf', host: '192.168.1.51', status: 'connected', lastError: null,
             rules: [ { id: 'w3', event: 'death', action: 'color', color: '#0000FF', effect: 'solid', durationSeconds: 1.5, preset: 1 } ] } ] },
       { id: 'sound', enabled: true, status: 'ready', lastError: null, config: {},
-        rules: [ { id: 's1', event: 'kill', sound: 'ding', volume: 70 }, { id: 's2', event: 'death', sound: 'low', volume: 60 } ] }
+        rules: [ { id: 's1', event: 'kill', sound: 'ding', volume: 70 }, { id: 's2', event: 'death', sound: 'low', volume: 60 } ] },
+      { id: 'overlay', enabled: true, status: 'ready', lastError: null, config: { port: 4466, url: 'http://localhost:4466/' } }
 
     ],
     settings: {

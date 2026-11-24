@@ -30,6 +30,7 @@ public sealed record Config(
     HomeAssistantSettings? HomeAssistant = null,
     WledSettings? Wled = null,
     SoundSettings? Sound = null,
+    OverlaySettings? Overlay = null,
     bool Active = true,
     string ToggleHotkey = "Ctrl+Alt+M")
 {
@@ -52,6 +53,8 @@ public sealed record Config(
     public WledSettings Wled { get; init; } = Wled ?? new WledSettings();
 
     public SoundSettings Sound { get; init; } = Sound ?? new SoundSettings();
+
+    public OverlaySettings Overlay { get; init; } = Overlay ?? new OverlaySettings();
 
     public static Config LoadOrDefault(string path) => File.Exists(path) ? Load(path) : new Config([]);
 
@@ -88,6 +91,8 @@ public sealed record Config(
             throw new InvalidDataException($"{path}: an OBS rule has an unknown event or action.");
         if (Obs.Rules.Any(r => r.DelaySeconds is < 0 or > 60 || r.DurationSeconds is < 0 or > 60))
             throw new InvalidDataException($"{path}: OBS rule delays and durations must be between 0 and 60 seconds.");
+        if (Obs.ClipSeconds is < 3 or > 60) throw new InvalidDataException($"{path}: the highlight clip length must be between 3 and 60 seconds.");
+        if (Overlay.Port is < 1 or > 65535) throw new InvalidDataException($"{path}: the overlay port must be between 1 and 65535.");
         if (Mqtt.Port is < 1 or > 65535) throw new InvalidDataException($"{path}: MQTT port must be between 1 and 65535.");
         if (Mqtt.Qos is < 0 or > 2) throw new InvalidDataException($"{path}: MQTT QoS must be 0, 1 or 2.");
         if (string.IsNullOrWhiteSpace(Mqtt.TopicPrefix) || Mqtt.TopicPrefix.IndexOfAny(['#', '+']) >= 0 || Mqtt.TopicPrefix.EndsWith('/'))
@@ -109,8 +114,10 @@ public sealed record Config(
 }
 
 /// <summary>OBS plugin: OBS WebSocket (v5) connection and the rules "when Game Event, do action".
-/// The password is stored as typed, like OBS stores it in its own settings.</summary>
-public sealed record ObsSettings(bool Enabled = false, string Host = "localhost", int Port = 4455, string Password = "", IReadOnlyList<ObsRule>? Rules = null)
+/// The password is stored as typed, like OBS stores it in its own settings.
+/// <see cref="HighlightReel"/>: after each Match, join the last <see cref="ClipSeconds"/> of every replay saved in it into one video (needs ffmpeg).</summary>
+public sealed record ObsSettings(bool Enabled = false, string Host = "localhost", int Port = 4455, string Password = "", IReadOnlyList<ObsRule>? Rules = null,
+    bool HighlightReel = false, double ClipSeconds = 10)
 {
     public static readonly string[] Events = ["match_started", "kill", "knockdown", "death", "match_ended"];
     public static readonly string[] Actions =
@@ -132,3 +139,6 @@ public sealed record ObsRule(string Id, string Event, string Action, string Para
 /// <c>&lt;TopicPrefix&gt;/status</c>. The password is stored as typed.</summary>
 public sealed record MqttSettings(bool Enabled = false, string Host = "localhost", int Port = 1883, bool UseTls = false,
     string Username = "", string Password = "", string TopicPrefix = "matchpulse", int Qos = 1);
+
+/// <summary>Stream overlay: a local page for an OBS browser source (see <see cref="OverlayServer"/>).</summary>
+public sealed record OverlaySettings(bool Enabled = false, int Port = 4466);

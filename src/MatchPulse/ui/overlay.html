@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MatchPulse Overlay</title>
+<!-- OBS browser source: transparent page with the match timer, the kill count and a pop on every kill.
+     ?color=ff0000 sets the accent colour (default the Kill Marker red). -->
+<style>
+  :root { --accent: #ff2a2a; }
+  html, body { margin: 0; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; color: #fff; }
+  .hud { position: absolute; left: 24px; top: 24px; display: flex; gap: 10px; align-items: stretch; }
+  .box { background: rgba(10, 12, 16, .72); border-left: 4px solid var(--accent); border-radius: 6px; padding: 8px 16px; display: flex; flex-direction: column; justify-content: center; min-width: 72px; }
+  .cap { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #c8ccd2; }
+  .val { font-size: 34px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .hidden { display: none; }
+  .bump { animation: bump .45s ease-out; }
+  @keyframes bump { 0% { transform: scale(1); } 30% { transform: scale(1.35); color: var(--accent); } 100% { transform: scale(1); } }
+  .pop { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; opacity: 0; }
+  .pop.show { animation: pop 1.6s ease-out forwards; }
+  .pop .big { font-size: 96px; font-weight: 900; letter-spacing: .06em; color: var(--accent); text-shadow: 0 0 24px var(--accent), 0 4px 0 rgba(0,0,0,.6); }
+  .pop .small { font-size: 28px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    22% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="box" id="timeBox"><span class="cap">Match</span><span class="val" id="time">0:00</span></div>
+    <div class="box"><span class="cap">Kills</span><span class="val" id="kills">0</span></div>
+  </div>
+  <div class="pop" id="pop"><div class="big" id="popBig">KILL</div><div class="small" id="popSmall"></div></div>
+<script>
+  const color = new URLSearchParams(location.search).get('color');
+  if (color && /^[0-9a-f]{6}$/i.test(color)) document.documentElement.style.setProperty('--accent', '#' + color);
+  const $ = (id) => document.getElementById(id);
+  let startedAt = null, kills = 0, popTimer;
+
+  function render() {
+    $('timeBox').classList.toggle('hidden', !startedAt);
+    $('kills').textContent = kills;
+    tick();
+  }
+  function tick() {
+    if (!startedAt) return;
+    const s = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+    $('time').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+  function pop(big, small) {
+    $('popBig').textContent = big; $('popSmall').textContent = small;
+    restart($('pop'), 'show');
+    clearTimeout(popTimer); popTimer = setTimeout(() => $('pop').classList.remove('show'), 1700);
+  }
+
+  const events = new EventSource('/events');
+  events.addEventListener('state', (m) => { const s = JSON.parse(m.data); startedAt = s.startedAt; kills = s.kills; render(); });
+  events.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    if (e.type === 'kill') { restart($('kills'), 'bump'); pop('KILL', '#' + e.data.kills); }
+    else if (e.type === 'knockdown') pop('KNOCK', '');
+    else if (e.type === 'match_ended') pop(e.data.result === 'victory' ? 'VICTORY' : 'GG', (e.data.kills || 0) + ' Kills');
+  };
+  setInterval(tick, 1000);
+  render();
+</script>
+</body>
+</html>

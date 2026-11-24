@@ -32,7 +32,7 @@ public sealed class UiHub : IEventSink
     JsonObject? _match;
     DateTimeOffset _since = DateTimeOffset.Now; // outside a Match, the live monitor shows kills from here on
     readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null), ["homeassistant"] = ("disconnected", null),
-        ["wled"] = ("disconnected", null), ["sound"] = ("ready", null) };
+        ["wled"] = ("disconnected", null), ["sound"] = ("ready", null), ["overlay"] = ("disconnected", null) };
     readonly Dictionary<string, (string Status, string? Error)> _wled = []; // per WLED device id; "wled" above is the worst of them
     static readonly HttpClient PluginHttp = new() { Timeout = TimeSpan.FromSeconds(5) };
 
@@ -213,6 +213,7 @@ public sealed class UiHub : IEventSink
             case "testPlugin" when (string?)payload!["id"] == "homeassistant": _ = TestHomeAssistantAsync(_config()); break;
             case "savePlugin" when (string?)payload!["id"] == "wled": Apply(_config() with { Wled = WledFrom(payload!.AsObject()) }); break;
             case "testPlugin" when (string?)payload!["id"] == "wled": _ = TestWledAsync((string?)payload["device"]); break;
+            case "savePlugin" when (string?)payload!["id"] == "overlay": Apply(_config() with { Overlay = OverlayFrom(payload!.AsObject()) }); break;
             case "savePlugin" when (string?)payload!["id"] == "sound": Apply(_config() with { Sound = SoundFrom(payload!.AsObject()) }); break;
             case "testRule": _ = TestRuleAsync((string?)payload!["id"], (string?)payload["ruleId"]); break;
             case "setActive": Apply(_config() with { Active = (bool?)payload!["active"] ?? true }); break;
@@ -238,7 +239,7 @@ public sealed class UiHub : IEventSink
                 ["hostProblems"] = Problems(),
                 ["events"] = new JsonArray([.. _events.Select(e => e.DeepClone())]),
                 ["sinks"] = Sinks(config),
-                ["plugins"] = new JsonArray(Obs(config.Obs), Mqtt(config.Mqtt), HomeAssistantPlugin(config), Wled(config.Wled), SoundPlugin(config.Sound)),
+                ["plugins"] = new JsonArray(Obs(config.Obs), Mqtt(config.Mqtt), HomeAssistantPlugin(config), Wled(config.Wled), SoundPlugin(config.Sound), OverlayPlugin(config.Overlay)),
                 ["settings"] = Settings(config),
                 ["highlights"] = Highlights(),
                 ["diagnostics"] = Diagnostics(),
@@ -507,7 +508,7 @@ public sealed class UiHub : IEventSink
             newFailure = error is not null && (device is null ? _plugins[id].Status : _wled.GetValueOrDefault(device).Status) != "error";
             // Reached, but a rule failed (OBS answered with an error code, WLED with an HTTP status): not a connection problem.
             var ruleFailed = error is ObsException { Code: not null } or HttpRequestException { StatusCode: not null };
-            state = (error is null ? (id == "sound" ? "ready" : "connected") : ruleFailed ? "ruleFailed" : "error",
+            state = (error is null ? (id is "sound" or "overlay" ? "ready" : "connected") : ruleFailed ? "ruleFailed" : "error",
                 error is null ? null : PluginMessage(id, error));
             if (device is null) _plugins[id] = state;
             else
@@ -521,7 +522,7 @@ public sealed class UiHub : IEventSink
             }
         }
         Send("pluginStatus", new JsonObject { ["id"] = id, ["status"] = state.Status, ["lastError"] = state.Error, ["devices"] = devices });
-        if (newFailure && id != "homeassistant")
+        if (newFailure && id is not ("homeassistant" or "overlay"))
             Problem?.Invoke(id switch { "obs" => "ObsFailed", "mqtt" => "MqttFailed", "wled" => "WledFailed", _ => "SoundFailed" }, "plugins");
     }
 
@@ -580,7 +581,7 @@ public sealed class UiHub : IEventSink
                 ["enabled"] = obs.Enabled,
                 ["status"] = _plugins["obs"].Status,
                 ["lastError"] = _plugins["obs"].Error,
-                ["config"] = new JsonObject { ["host"] = obs.Host, ["port"] = obs.Port, ["password"] = obs.Password },
+                ["config"] = new JsonObject { ["host"] = obs.Host, ["port"] = obs.Port, ["password"] = obs.Password, ["highlightReel"] = obs.HighlightReel, ["clipSeconds"] = obs.ClipSeconds },
                 ["rules"] = new JsonArray([.. obs.Rules.Select(r => (JsonNode)new JsonObject
                 {
                     ["id"] = r.Id, ["event"] = r.Event, ["action"] = r.Action, ["param"] = r.Param,
@@ -599,8 +600,30 @@ public sealed class UiHub : IEventSink
             (string?)c["password"] ?? "",
             [.. p["rules"]!.AsArray().Select(r => new ObsRule(
                 (string?)r!["id"] ?? Guid.NewGuid().ToString("N"), (string?)r["event"] ?? "", (string?)r["action"] ?? "",
-                ((string?)r["param"] ?? "").Trim(), (string?)r["text"] ?? "", (double?)r["delaySeconds"] ?? 0, (double?)r["durationSeconds"] ?? 0))]);
+                ((string?)r["param"] ?? "").Trim(), (string?)r["text"] ?? "", (double?)r["delaySeconds"] ?? 0, (double?)r["durationSeconds"] ?? 0))],
+            (bool?)c["highlightReel"] ?? false, (double?)c["clipSeconds"] ?? 10);
     }
+
+    JsonObject OverlayPlugin(OverlaySettings o)
+    {
+        lock (_lock)
+            return new JsonObject
+            {
+                ["id"] = "overlay",
+                ["enabled"] = o.Enabled,
+                ["status"] = o.Enabled ? _plugins["overlay"].Status : "disconnected",
+                ["lastError"] = _plugins["overlay"].Error,
+                ["config"] = new JsonObject { ["port"] = o.Port, ["url"] = OverlayServer.Url(o.Port) },
+            };
+    }
+
+    public static OverlaySettings OverlayFrom(JsonObject p) => new((bool?)p["enabled"] ?? false, (int?)p["config"]!["port"] ?? 0);
+
+    /// <summary>The stream overlay (re)started: null when it listens.</summary>
+    public void OverlayResult(Exception? error) => PluginResult("overlay", error);
+
+    /// <summary>A highlight video was written.</summary>
+    public void ReelSaved(string path) => Logged(DateTimeOffset.Now, LogLevel.Information, $"Highlight video {path}");
 
     // ---------- JSON shapes ----------
 

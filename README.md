@@ -25,6 +25,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 - **Knockdowns** and **your death** in REDSEC
 - **Matches** in REDSEC: start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
+- **Highlight video** of every match, cut from the saved replays, and a **stream overlay** (match timer, kill counter, kill animation) as an OBS browser source
 - **MQTT** and **Home Assistant** (auto-discovered device with sensors and triggers), Node-RED and other automation tools
 - **WLED lights** that flash on a kill, and **sounds** for every event
 - **Webhooks and scripts** for anything else
@@ -138,6 +139,12 @@ MatchPulse controls OBS directly over **OBS WebSocket** (built into OBS 28 and l
 | Start / stop stream | |
 
 Every rule can wait a few seconds first — for example, save the replay buffer 3 s after a kill, so the moment after it is in the clip. Placeholders: `{kills}`, `{match}`, `{n}`, `{result}`, `{date}`, `{time}`.
+
+**Highlight video**: turn on *Create a highlight video after each match* in the OBS plugin. With a rule like *kill → save replay buffer*, MatchPulse takes the last N seconds (default 10) of every replay saved in the match and joins them into `Highlights <date> <time>` in the replay folder. Replays that overlap are used once. It needs [ffmpeg](https://ffmpeg.org) on the PATH (`winget install Gyan.FFmpeg`) and OBS on the same PC. Cuts are made without re-encoding, so they fall on keyframes.
+
+## Stream overlay
+
+Turn on **Plugins → Stream overlay** and add `http://localhost:4466/` in OBS as a *Browser* source (for example 1920 × 1080). The page has a transparent background and shows the match timer, the kill count and a big *KILL* pop on every kill. Add `?color=00ff88` to change the accent colour. The port can be changed in the plugin.
 
 ## WLED and sound
 

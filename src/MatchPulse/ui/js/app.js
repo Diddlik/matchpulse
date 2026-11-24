@@ -43,7 +43,8 @@
     mqtt: 'M5 19a1 1 0 1 0 0-.01M5 13a6 6 0 0 1 6 6M5 7a12 12 0 0 1 12 12',
     homeassistant: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5',
     wled: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
-    sound: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6'
+    sound: 'M4 9h4l5-4v14l-5-4H4zM16.5 9a4 4 0 0 1 0 6',
+    overlay: 'M3 5h18v14H3zM6 8h5v3H6zM14 15h4'
   };
   const icon = (name, size) => `<svg width="${size || 18}" height="${size || 18}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const X_ICON = '<svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.4"/></svg>';
@@ -318,6 +319,25 @@
               </div>
               ${p.enabled && (p.status === 'error' || p.status === 'ruleFailed') ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || t('obs_err'))}</div>` : ''}
               <span class="small muted">${esc(t('obs_hint'))}</span>
+              <div class="stack-s" style="gap:8px;padding-top:12px;border-top:1px solid var(--border)">
+                <h3>${esc(t('obs_reel'))}</h3>
+                <div class="row-flex" style="gap:16px">
+                  <label class="row-flex" style="gap:10px;min-height:40px;flex-wrap:nowrap"><input class="check" type="checkbox" ${p.config.highlightReel ? 'checked' : ''} data-change="obsReel"><span>${esc(t('obs_reel_on'))}</span></label>
+                  <label class="row-flex small muted" style="gap:6px">${esc(t('obs_reel_secs'))}<input class="input num" type="number" min="3" max="60" step="1" style="width:70px" value="${p.config.clipSeconds}" data-change="obsClip">s</label>
+                </div>
+                ${p.config.highlightReel && !p.rules.some((r) => r.action === 'save_replay') ? `<div class="notice warn row-flex">${WARN_ICON}<span class="small">${esc(t('obs_reel_norule'))}</span></div>` : ''}
+                <span class="small muted">${esc(t('obs_reel_d'))}</span>
+              </div>
+            </div>` : p.id === 'overlay' ? `
+            <div class="stack" style="gap:12px">
+              <span class="small muted">${esc(t('ov_intro'))}</span>
+              <div class="row-flex" style="align-items:flex-end">
+                <label class="field" style="flex:0 0 100px"><span>${esc(t('obs_port'))}</span><input class="input mono" type="text" inputmode="numeric" value="${esc(p.config.port)}" data-change="ovPort"></label>
+                <label class="field" style="flex:1 1 240px"><span>${esc(t('ov_url'))}</span><input class="input mono" type="text" readonly value="${esc(p.config.url)}"></label>
+                <button type="button" class="btn" data-act="copyOverlay">${esc(S.copied ? t('copied') : t('copy'))}</button>
+              </div>
+              ${p.enabled && p.status === 'error' ? `<div class="notice error" style="border:0;padding:8px 12px;font-size:13px">${esc(p.lastError || '')}</div>` : ''}
+              <span class="small muted">${esc(t('ov_hint'))}</span>
             </div>` : p.id === 'wled' ? (() => { const d = wlDev(p); return `
             <div class="stack" style="gap:12px">
               <div class="row-flex"><h3 class="grow">${esc(t('wl_devices'))}</h3><button type="button" class="btn s" data-act="addWlDev">${esc(t('wl_add_device'))}</button></div>
@@ -389,7 +409,7 @@
               </div>
               <label class="row-flex" style="gap:10px;min-height:40px;flex-wrap:nowrap"><input class="check" type="checkbox" ${p.config.restoreOnExit ? 'checked' : ''} data-change="restoreOnExit"><span>${esc(t('au_restore'))}</span></label>
             </div>`}
-          ${p.id === 'mqtt' || p.id === 'homeassistant' || (p.id === 'wled' && !wlDev(p)) ? `<span class="small muted">${esc(t('pl_apply'))}</span>` : `<div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
+          ${p.id === 'mqtt' || p.id === 'homeassistant' || p.id === 'overlay' || (p.id === 'wled' && !wlDev(p)) ? `<span class="small muted">${esc(t('pl_apply'))}</span>` : `<div class="stack" style="gap:10px;padding-top:16px;border-top:1px solid var(--border)">
             <div class="row-flex"><h3 class="grow">${esc(p.id === 'wled' ? t('wl_rules_of', { n: wlDev(p).name || wlDev(p).host || 'WLED' }) : t('pl_rules'))}</h3><button type="button" class="btn s" data-act="addRule">${esc(t('pl_add_rule'))}</button></div>
             ${rulesOf(p).map((r) => `
               <div class="rule">
@@ -598,6 +618,7 @@
     openEvent: (k) => { S.page = 'events'; S.evFilter = 'all'; S.selEvent = k; S.copied = false; },
     selEvent: (k) => { S.selEvent = k; S.copied = false; },
     evFilter: (f) => { S.evFilter = f; },
+    copyOverlay: () => { const p = S.plugins.find((x) => x.id === 'overlay'); if (p && navigator.clipboard) navigator.clipboard.writeText(p.config.url); S.copied = true; },
     copyJson: () => { const e = S.events.find((x) => evKey(x) === S.selEvent); if (e && navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(e, null, 2)); S.copied = true; },
     testAll: () => { B.send('sendTestEvent', { sinkIds: S.sinks.map((k) => k.id) }); toast(t('test_sent', { n: S.sinks.length })); },
     testSink: (id) => { B.send('sendTestEvent', { sinkIds: [id] }); toast(t('test_one')); },
@@ -665,6 +686,9 @@
     obsHost: (v) => editPlug((p) => { p.config.host = v.trim(); }, 'obs'),
     obsPort: (v) => editPlug((p) => { p.config.port = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'obs'),
     obsPw: (v) => editPlug((p) => { p.config.password = v; }, 'obs'),
+    obsReel: (v, el) => editPlug((p) => { p.config.highlightReel = el.checked; }, 'obs'),
+    obsClip: (v) => editPlug((p) => { p.config.clipSeconds = Math.min(60, Math.max(3, Number(v) || 10)); }, 'obs'),
+    ovPort: (v) => editPlug((p) => { p.config.port = Number(String(v).replace(/[^0-9]/g, '')) || 0; p.config.url = 'http://localhost:' + p.config.port + '/'; }, 'overlay'),
     mq: (v, el) => editPlug((p) => { p.config[el.dataset.key] = el.dataset.key === 'password' ? v : v.trim(); }, 'mqtt'),
     mqNum: (v, el) => editPlug((p) => { p.config[el.dataset.key] = Number(String(v).replace(/[^0-9]/g, '')) || 0; }, 'mqtt'),
     ha: (v, el) => editPlug((p) => { p.config[el.dataset.key] = v.trim(); }, 'homeassistant'),

@@ -29,6 +29,7 @@ sealed class TrayApp : ApplicationContext
     static readonly Icon AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icons[TrayState.MatchRunning];
     readonly SynchronizationContext _ui;
     readonly UiHub _hub;
+    readonly OverlayServer _overlay = new();
     readonly CancellationTokenSource _stop = new();
     readonly Thread _watcher;
     MainWindow? _window, _liveWindow;
@@ -54,6 +55,8 @@ sealed class TrayApp : ApplicationContext
             _hub.ConfigInvalid();
             MessageBox.Show($"{Ui.T(Config.UiLanguage, "ConfigInvalid")}\n\n{configPath}\n{e.Message}", "MatchPulse", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+        _overlay.Started += _hub.OverlayResult;
+        _overlay.Configure(Config.Overlay);
         Dispatcher = new EventDispatcher(Sinks(), log);
         Dispatcher.Delivered += _hub.Delivered;
         _hub.Problem += (key, page) => _ui.Post(_ => Notify(key, page), null);
@@ -85,7 +88,7 @@ sealed class TrayApp : ApplicationContext
     /// <summary>The Event Dispatcher; its Event Sinks are replaced when settings are saved.</summary>
     public EventDispatcher Dispatcher { get; }
 
-    IEnumerable<IEventSink> Sinks() => [Status, _hub, .. Program.Sinks(Config, _http, _hub.Delivered)];
+    IEnumerable<IEventSink> Sinks() => [Status, _hub, _overlay, .. Program.Sinks(Config, _http, _hub.Delivered, _hub.ReelSaved)];
 
     // Called by the UiHub on a worker thread; throws InvalidDataException for invalid settings.
     void Apply(Config config)
@@ -98,6 +101,7 @@ sealed class TrayApp : ApplicationContext
             if (before.Active != config.Active) ShowActive();
             if (before.ToggleHotkey != config.ToggleHotkey) RegisterHotkey();
         }, null);
+        _overlay.Configure(config.Overlay);
         Dispatcher.ReplaceSinks(Sinks());
         _log.LogInformation("Settings applied: game language {Language}, Kill Marker colour {Color}, {Webhooks} webhook(s), {Scripts} script(s)",
             config.GameLanguage, config.KillMarkerColor, config.Webhooks.Count, config.Scripts.Count);
@@ -234,6 +238,7 @@ sealed class TrayApp : ApplicationContext
         _stop.Cancel();
         _watcher.Join(TimeSpan.FromSeconds(5));
         Dispatcher.CompleteAsync().Wait(TimeSpan.FromSeconds(5));
+        _overlay.Dispose();
         _http.Dispose();
         _download.Dispose();
         base.ExitThreadCore();

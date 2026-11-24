@@ -13,9 +13,14 @@ namespace MatchPulse;
 /// later on their own connection and report their result to <paramref name="later"/>.
 /// Starting what already runs, or stopping what does not, is not an error.
 /// </summary>
-public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>? later = null) : IEventSink
+/// With <see cref="ObsSettings.HighlightReel"/>, the replays saved in a Match are joined into a video at <c>match_ended</c>
+/// (see <see cref="HighlightReel"/>); its path goes to <paramref name="reelSaved"/>.
+public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>? later = null, Action<string>? reelSaved = null) : IEventSink
 {
     public ObsSettings Settings => settings;
+
+    readonly Lock _lock = new();
+    readonly List<HighlightReel.Replay> _replays = []; // saved in this Match
 
     const int ReplayBufferOff = 501; // OBS: OutputNotRunning
 
@@ -24,7 +29,13 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
         var rules = settings.Rules.Where(r => r.Event == gameEvent.Type).ToList();
         foreach (var rule in rules.Where(r => r.DelaySeconds > 0))
             Later(TimeSpan.FromSeconds(rule.DelaySeconds), session => RunAsync(session, rule, gameEvent), rule.Action == "save_replay");
-        var now = rules.Where(r => r.DelaySeconds <= 0).ToList();
+        if (gameEvent.Type == "match_started") lock (_lock) _replays.Clear();
+        try { await RunNowAsync(rules.Where(r => r.DelaySeconds <= 0).ToList(), gameEvent, cancellationToken); }
+        finally { if (gameEvent.Type == "match_ended") Reel(gameEvent.OccurredAt); }
+    }
+
+    async Task RunNowAsync(List<ObsRule> now, GameEvent gameEvent, CancellationToken cancellationToken)
+    {
         if (now.Count == 0) return;
 
         await using var session = await ObsSession.ConnectAsync(settings, now.Any(r => r.Action == "save_replay"), cancellationToken);
@@ -69,7 +80,10 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
                     await obs.RequestAsync("StartReplayBuffer", alreadyDone: true);
                     throw new ObsException("The replay buffer was off in OBS. MatchPulse started it now: this clip is missing, the next ones are saved.", ReplayBufferOff);
                 }
-                if (rule.Param is not "") RenameReplay(await obs.WaitForReplayAsync(), ObsTemplate.Fill(rule.Param, e));
+                if (rule.Param is "" && !settings.HighlightReel) break;
+                var saved = await obs.WaitForReplayAsync();
+                if (rule.Param is not "") saved = RenameReplay(saved, ObsTemplate.Fill(rule.Param, e));
+                if (settings.HighlightReel && e.MatchId is not null) lock (_lock) _replays.Add(new(saved, DateTimeOffset.Now));
                 break;
             case "switch_scene": await obs.RequestAsync("SetCurrentProgramScene", new JsonObject { ["sceneName"] = rule.Param }); break;
             case "set_text":
@@ -116,8 +130,28 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
         }
     });
 
-    /// <summary>Renames the saved replay next to itself. Only possible when OBS runs on this PC.</summary>
-    void RenameReplay(string path, string name)
+    // The Match ended: builds its highlight video in the background.
+    void Reel(DateTimeOffset endedAt)
+    {
+        List<HighlightReel.Replay> replays;
+        lock (_lock) { replays = [.. _replays]; _replays.Clear(); }
+        if (!settings.HighlightReel || replays.Count == 0) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                reelSaved?.Invoke(await HighlightReel.BuildAsync(replays, settings.ClipSeconds, endedAt));
+                later?.Invoke(this, null);
+            }
+            catch (Exception e)
+            {
+                later?.Invoke(this, e);
+            }
+        });
+    }
+
+    /// <summary>Renames the saved replay next to itself and returns the new path. Only possible when OBS runs on this PC.</summary>
+    string RenameReplay(string path, string name)
     {
         if (!File.Exists(path)) throw new ObsException($"Saved replay {path} is not on this PC, so it cannot be renamed.");
         var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
@@ -125,6 +159,7 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
         for (var n = 2; File.Exists(target); n++)
             target = Path.Combine(Path.GetDirectoryName(path)!, $"{safe}-{n}{Path.GetExtension(path)}");
         File.Move(path, target);
+        return target;
     }
 
     public override string ToString() => $"OBS {settings.Host}:{settings.Port}";

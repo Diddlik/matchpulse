@@ -81,11 +81,12 @@ static class Program
 
     /// <summary>The Event Sinks the config file asks for.</summary>
     /// <param name="later">Results of OBS rules that run after a delay.</param>
-    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http, Action<IEventSink, Exception?>? later = null) =>
+    /// <param name="reelSaved">The path of each highlight video.</param>
+    public static IEnumerable<IEventSink> Sinks(Config config, HttpClient http, Action<IEventSink, Exception?>? later = null, Action<string>? reelSaved = null) =>
         [
             .. config.Webhooks.Select(url => new WebhookSink(http, url)),
             .. config.Scripts.Select(command => new ScriptSink(command, TimeSpan.FromSeconds(10))),
-            .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs, later)] : Array.Empty<IEventSink>(),
+            .. config.Obs is { Enabled: true, Rules.Count: > 0 } ? [new ObsSink(config.Obs, later, reelSaved)] : Array.Empty<IEventSink>(),
             .. config.Mqtt.Enabled ? [new MqttSink(config.Mqtt, config.HomeAssistant, later)] : Array.Empty<IEventSink>(),
             .. config.Wled.Enabled ? config.Wled.Devices.Where(d => d.Rules.Count > 0 && d.Host.Trim() != "").Select(d => new WledSink(http, d, later)) : [],
             .. config.Sound is { Enabled: true, Rules.Count: > 0 } ? [new SoundSink(config.Sound)] : Array.Empty<IEventSink>(),
