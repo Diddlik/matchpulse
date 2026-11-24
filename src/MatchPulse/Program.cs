@@ -23,6 +23,14 @@ static class Program
         {
             case [] or ["--show"]:
             {
+                // An installer is replacing the files (SetupMutex in installer/MatchPulse.iss): starting now would lock
+                // them and make it fail. It starts MatchPulse itself when done.
+                if (SetupRunning())
+                {
+                    log.LogWarning("MatchPulse is being installed or updated; not starting");
+                    return 0;
+                }
+
                 // One tray app per user: a second start (e.g. from the Start menu) only opens the running one's window.
                 using var single = new Mutex(true, @"Local\MatchPulse", out var first);
                 using var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\MatchPulse.Show");
@@ -91,6 +99,17 @@ static class Program
             .. config.Wled.Enabled ? config.Wled.Devices.Where(d => d.Rules.Count > 0 && d.Host.Trim() != "").Select(d => new WledSink(http, d, later)) : [],
             .. config.Sound is { Enabled: true, Rules.Count: > 0 } ? [new SoundSink(config.Sound)] : Array.Empty<IEventSink>(),
         ];
+
+    static bool SetupRunning()
+    {
+        try
+        {
+            if (!Mutex.TryOpenExisting(@"Global\MatchPulseSetup", out var mutex)) return false;
+            mutex.Dispose();
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return true; } // created by an elevated installer
+    }
 
     [DllImport("kernel32.dll")]
     static extern bool AttachConsole(int processId);
