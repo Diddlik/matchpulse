@@ -71,6 +71,8 @@
   const sinkStatus = (k) => (k.lastError ? 'err' : k.lastSuccessAt ? 'ok' : 'new');
   const sinkCls = (s) => (s === 'err' ? 'st-err' : s === 'ok' ? 'st-ok' : 'st-idle');
   const sinkError = (k) => (k.lastError ? (k.lastError.code === 'timeout' ? t('err_timeout') : k.lastError.code === 'script_timeout' ? t('err_script') : k.lastError.message) : '');
+  // Outside a Match only the kills since the game started or the last Match ended, so the count starts over.
+  const liveHighlights = () => S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : !S.since || new Date(h.capturedAt) >= new Date(S.since)));
   const roundKills = () => S.events.filter((e) => e.type === 'kill' && (S.match ? e.matchId === S.match.matchId : true));
   const dirty = () => JSON.stringify(S.draft) !== JSON.stringify(S.settings);
   const problems = () => {
@@ -173,7 +175,7 @@
               <div class="row-flex ${sinkCls(s)}" style="gap:10px;flex-wrap:nowrap;font-size:13px"><span class="dot"></span><span class="mono ellipsis grow" style="font-size:12px">${esc(k.target)}</span><span class="status-text" style="font-weight:400">${esc(t('s_' + s))}</span></div>`; }).join('')}</div>
             ${S.plugins.length ? `<div class="stack-s" style="padding-top:10px;border-top:1px solid var(--border)">
               <span class="caption muted">${esc(t('nav_plugins'))}</span>
-              ${S.plugins.map((p) => { const s = plugStatus(p); return `<div class="row-flex ${plugCls(s)}" style="gap:10px;flex-wrap:nowrap;font-size:13px"><span class="dot"></span><span class="grow">${esc(t('pl_' + p.id))}</span><span class="status-text" style="font-weight:400">${esc(t('ps_' + s))}</span></div>`; }).join('')}
+              ${S.plugins.map((p) => { const s = plugStatus(p); return `<div class="row-flex ${plugCls(s)}" style="gap:10px;flex-wrap:nowrap;font-size:13px"><span class="dot"></span><span class="grow">${esc(t('pl_' + p.id))}</span><span class="status-text" style="font-weight:400">${esc(psLabel(p.id, s))}</span></div>`; }).join('')}
             </div>` : ''}
             <button type="button" class="btn" style="align-self:flex-start" data-act="testAll">${esc(t('send_test_all'))}</button>
           </section>
@@ -205,7 +207,7 @@
 
   function pageLive() {
     const on = S.settings.liveMonitor;
-    const hl = S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : true)).slice().sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+    const hl = liveHighlights().slice().sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
     const n = hl.length, i = n ? (S.liveIdx < 0 || S.liveIdx >= n ? n - 1 : S.liveIdx) : 0, h = hl[i];
     const label = (x, k) => t('live_title', { n: x.matchId ? x.sequence - 1 : k + 1 });
     const marker = S.settings.killMarkerColor;
@@ -627,7 +629,7 @@
     testRule: (id) => B.send('testRule', { id: curPlug().id, ruleId: id }),
     removeRule: (id) => editPlug((p) => { const rules = rulesOf(p); rules.splice(rules.findIndex((r) => r.id === id), 1); }),
     liveOn: () => { S.settings.liveMonitor = true; S.draft.liveMonitor = true; S.liveIdx = -1; B.send('setLiveMonitor', { enabled: true }); },
-    liveStep: (d) => { const n = S.highlights.filter((h) => (S.match ? h.matchId === S.match.matchId : true)).length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
+    liveStep: (d) => { const n = liveHighlights().length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
     liveIdx: (i) => { S.liveIdx = Number(i); },
     liveWindow: () => B.send('openLiveWindow'),
     simulateKill: () => B.simulateKill && B.simulateKill(),
@@ -741,7 +743,7 @@
         settings: p.settings, draft: clone(p.settings), hexDraft: p.settings.killMarkerColor, diagnostics: p.diagnostics || [], highlights: p.highlights || [], log: p.log || [], update: p.update || null, loaded: true });
       const lastKill = S.events.slice().reverse().find((e) => e.type === 'kill'); if (lastKill) S.selEvent = evKey(lastKill);
     },
-    state: (p) => { S.appState = p.appState; S.match = p.match; },
+    state: (p) => { S.appState = p.appState; S.match = p.match; S.since = p.since; },
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },

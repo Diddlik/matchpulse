@@ -30,6 +30,7 @@ public sealed class UiHub : IEventSink
     readonly HashSet<string> _problems = [];
     bool _game;
     JsonObject? _match;
+    DateTimeOffset _since = DateTimeOffset.Now; // outside a Match, the live monitor shows kills from here on
     readonly Dictionary<string, (string Status, string? Error)> _plugins = new() { ["obs"] = ("disconnected", null), ["mqtt"] = ("disconnected", null), ["homeassistant"] = ("disconnected", null),
         ["wled"] = ("disconnected", null), ["sound"] = ("ready", null) };
     readonly Dictionary<string, (string Status, string? Error)> _wled = []; // per WLED device id; "wled" above is the worst of them
@@ -89,6 +90,7 @@ public sealed class UiHub : IEventSink
         {
             _game = running;
             if (!running) _match = null;
+            else _since = DateTimeOffset.Now;
             _problems.Remove("capture_failed");
         }
         Send("state", State());
@@ -113,7 +115,10 @@ public sealed class UiHub : IEventSink
             if (gameEvent.Type == "match_started")
                 _match = new JsonObject { ["matchId"] = gameEvent.MatchId, ["startedAt"] = gameEvent.OccurredAt };
             else if (gameEvent.Type == "match_ended")
+            {
                 _match = null;
+                _since = gameEvent.OccurredAt;
+            }
         }
         Send("gameEvent", node);
         if (gameEvent.Type is "match_started" or "match_ended") Send("state", State());
@@ -578,7 +583,7 @@ public sealed class UiHub : IEventSink
 
     JsonObject State()
     {
-        lock (_lock) return new JsonObject { ["appState"] = AppState(), ["match"] = _match?.DeepClone() };
+        lock (_lock) return new JsonObject { ["appState"] = AppState(), ["match"] = _match?.DeepClone(), ["since"] = _since };
     }
 
     string AppState() => _match is not null ? "match" : _game ? "game" : "off";
