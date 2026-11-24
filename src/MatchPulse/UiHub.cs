@@ -372,6 +372,29 @@ public sealed class UiHub : IEventSink
     }
 
     /// <summary>Periodic reachability check (WLED has no open connection to watch). Reports only changes.</summary>
+    /// <summary>Every 30 s: OBS started later shows as connected, a lost connection as an error.
+    /// While OBS was never reached it stays "disconnected" quietly, as OBS not running is normal.</summary>
+    public async Task CheckObsAsync()
+    {
+        var settings = _config().Obs;
+        if (!settings.Enabled) return;
+        string before;
+        lock (_lock) before = _plugins["obs"].Status;
+        try
+        {
+            await ObsSink.TestAsync(settings, CancellationToken.None);
+            if (before is "connected" or "ruleFailed") return; // keep a failed rule visible
+            Logged(DateTimeOffset.Now, LogLevel.Information, $"OBS reached at {settings.Host}:{settings.Port}");
+            PluginResult("obs", null);
+        }
+        catch (Exception e)
+        {
+            if (before is "error" or "disconnected") return;
+            Logged(DateTimeOffset.Now, LogLevel.Warning, $"OBS at {settings.Host}:{settings.Port} not reachable: {e.Message}");
+            PluginResult("obs", e);
+        }
+    }
+
     public async Task CheckWledAsync()
     {
         var settings = _config().Wled;

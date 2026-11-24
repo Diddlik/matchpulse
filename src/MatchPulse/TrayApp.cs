@@ -24,7 +24,7 @@ sealed class TrayApp : ApplicationContext
     readonly ILogger _log;
     readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
     readonly HttpClient _download = new() { Timeout = TimeSpan.FromMinutes(10) };
-    System.Threading.Timer? _updateTimer, _wledTimer;
+    System.Threading.Timer? _updateTimer, _pluginTimer;
     readonly NotifyIcon _tray = new() { Visible = true };
     static readonly Icon AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icons[TrayState.MatchRunning];
     readonly SynchronizationContext _ui;
@@ -123,7 +123,7 @@ sealed class TrayApp : ApplicationContext
         };
         // First check shortly after start (if enabled), then once a minute for the daily check and a waiting install.
         _updateTimer = new System.Threading.Timer(_ => _ = updates.Tick(), null, TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1));
-        _wledTimer = new System.Threading.Timer(_ => _ = _hub.CheckWledAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
+        _pluginTimer = new System.Threading.Timer(_ => { _ = _hub.CheckWledAsync(); _ = _hub.CheckObsAsync(); }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
 
         // "Updated to version X" once after an update.
         var marker = Path.Combine(_hub.DataFolder, "version.txt");
@@ -225,7 +225,7 @@ sealed class TrayApp : ApplicationContext
     protected override void ExitThreadCore()
     {
         _updateTimer?.Dispose();
-        _wledTimer?.Dispose();
+        _pluginTimer?.Dispose();
         _hotkey?.Dispose();
         _window?.Close();
         _liveWindow?.Close();
