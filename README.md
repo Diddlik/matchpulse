@@ -23,7 +23,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 
 - **Kills** in every mode, also under a Jammer, without counting kills your Squad finishes
 - **Knockdowns** and **your death** in REDSEC
-- **Matches** in REDSEC and multiplayer rounds (Conquest, Team Deathmatch, Escalation): start, victory, defeat
+- **Matches** in REDSEC and multiplayer rounds (Conquest, Team Deathmatch, Escalation, Annihilation): start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
 - **Highlight video** of every match, cut from the saved replays, and a **stream overlay** (match timer, kill counter, kill animation) as an OBS browser source
 - **MQTT** and **Home Assistant** (auto-discovered device with sensors and triggers), Node-RED and other automation tools

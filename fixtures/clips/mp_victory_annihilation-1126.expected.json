@@ -1,0 +1,27 @@
+{
+  "clip": "mp_victory_annihilation-1126.mkv",
+  "source": {
+    "recording": "2026-11-26 15-17-08.mkv",
+    "start": 862.0,
+    "duration": 25.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 1.5,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 19.2,
+      "data": {
+        "result": "victory",
+        "reason": "end_screen",
+        "kills": "0"
+      }
+    }
+  ],
+  "notes": "Annihilation round won: the Player is down at the start (grey screen, faint score bar, confirmed at 1.5 s), deploy screen, banner SIEG with the blue shield-with-burst emblem from 19.2 s to 21.6 s."
+}

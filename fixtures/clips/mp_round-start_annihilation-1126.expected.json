@@ -1,0 +1,18 @@
+{
+  "clip": "mp_round-start_annihilation-1126.mkv",
+  "source": {
+    "recording": "2026-11-26 15-17-08.mkv",
+    "start": 274.0,
+    "duration": 14.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 8.5,
+      "data": {}
+    }
+  ],
+  "notes": "Annihilation (Vernichtung, Eastwood) round start: the score bar appears at 8.5 s. Its team boxes are grey and translucent, so the bar is found by its outline (mp_score_bar), not by colour."
+}

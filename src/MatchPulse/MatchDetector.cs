@@ -32,6 +32,7 @@ public sealed class MatchDetector
     static readonly (Scalar, Scalar)[] TeamBlue = [(new(85, 80, 150), new(105, 255, 255))];
     static readonly (Scalar, Scalar)[] TeamRed = [(new(0, 80, 150), new(15, 255, 255)), (new(170, 80, 150), new(180, 255, 255))];
     Mat[] _mpEndEmblems = [];
+    Mat? _mpScoreBar;
 
     // Match state: no Match while _matchId is null.
     string? _matchId;
@@ -119,8 +120,9 @@ public sealed class MatchDetector
         if (frame.Image.Size() != _frameSize) LoadTemplates(frame.Image.Size());
         var events = new List<GameEvent>();
         var hud = GrayScore(frame.Image, Cue.InMatchHud, _inMatchHud) >= Cue.InMatchHud.Threshold;
-        var mpHud = ColourShare(frame.Image, Cue.MpScoreBlue, TeamBlue) >= Cue.MpScoreBlue.Threshold
-            && ColourShare(frame.Image, Cue.MpScoreRed, TeamRed) >= Cue.MpScoreRed.Threshold;
+        var mpHud = (ColourShare(frame.Image, Cue.MpScoreBlue, TeamBlue) >= Cue.MpScoreBlue.Threshold
+            && ColourShare(frame.Image, Cue.MpScoreRed, TeamRed) >= Cue.MpScoreRed.Threshold)
+            || EdgeScore(frame.Image, Cue.MpScoreBar, _mpScoreBar!) >= Cue.MpScoreBar.Threshold;
 
         if (_matchId is null)
         {
@@ -386,7 +388,10 @@ public sealed class MatchDetector
         _endVictory = Cue.EndVictory.LoadTemplate(frame, _gameLanguage);
         _endDefeat = Cue.EndDefeat.LoadTemplate(frame, _gameLanguage);
         foreach (var emblem in _mpEndEmblems) emblem.Dispose();
-        _mpEndEmblems = [.. new[] { Cue.MpEndShield, Cue.MpEndHexagon, Cue.MpEndFlag }.Select(c => c.LoadTemplate(frame, _gameLanguage))];
+        _mpEndEmblems = [.. new[] { Cue.MpEndShield, Cue.MpEndHexagon, Cue.MpEndFlag, Cue.MpEndBurst }.Select(c => c.LoadTemplate(frame, _gameLanguage))];
+        _mpScoreBar?.Dispose();
+        using var bar = Cue.MpScoreBar.LoadTemplate(new Size(1280, 720), _gameLanguage); // scored at a fixed size, whatever the frame size
+        _mpScoreBar = bar.Threshold(0, 255, ThresholdTypes.Binary);
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>
@@ -437,6 +442,23 @@ public sealed class MatchDetector
             scores.MinMaxLoc(out _, out double max);
             return max;
         });
+    }
+
+    // Mean edge strength on the template's pixels over the mean of the whole region, the region scaled to the template.
+    // High when a translucent outline is drawn over any background.
+    static double EdgeScore(Mat image, Cue cue, Mat template)
+    {
+        using var region = cue.Crop(image);
+        using var gray = region.CvtColor(ColorConversionCodes.BGR2GRAY);
+        using var small = gray.Resize(template.Size(), 0, 0, InterpolationFlags.Area);
+        using var blurred = new Mat();
+        small.ConvertTo(blurred, MatType.CV_32F);
+        Cv2.GaussianBlur(blurred, blurred, new Size(3, 3), 0);
+        using var dx = blurred.Sobel(MatType.CV_32F, 1, 0);
+        using var dy = blurred.Sobel(MatType.CV_32F, 0, 1);
+        using var magnitude = new Mat();
+        Cv2.Magnitude(dx, dy, magnitude);
+        return Cv2.Mean(magnitude, template).Val0 / (Cv2.Mean(magnitude).Val0 + 1e-3);
     }
 
     // The share of a Cue region's pixels that fall in one of the HSV bands.

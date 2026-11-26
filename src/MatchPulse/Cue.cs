@@ -48,8 +48,13 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// <summary>Multiplayer: the enemy team score box at the right of the score bar, matched as the share of team-red pixels.</summary>
     public static readonly Cue MpScoreRed = new("mp_score_red", "", new Rect2d(0.6000, 0.0507, 0.0438, 0.0278), 0.03, 10);
 
+    /// <summary>Multiplayer: the outline of the score bar (box sides and the segment bars), for modes whose score boxes are grey
+    /// and translucent (Annihilation / "Vernichtung"). Scored as the mean edge strength on the template's pixels over the mean of the
+    /// whole region: bars score 2.5-5.7, REDSEC and menus at most 2.2.</summary>
+    public static readonly Cue MpScoreBar = new("mp_score_bar", "mp_score_bar_edges.png", new Rect2d(0.34375, 0.030556, 0.3125, 0.061111), 2.5, 10);
+
     /// <summary>Multiplayer: emblem of the banner at the end of a round, 2-3 s long. Its shape depends on the mode (Conquest: shield,
-    /// Team Deathmatch: hexagon with a skull, Escalation: shield with a flag), its colour on the result (blue "SIEG", red "NIEDERLAGE"), so both shapes are
+    /// Team Deathmatch: hexagon with a skull, Escalation: shield with a flag, Annihilation: shield with a burst), its colour on the result (blue "SIEG", red "NIEDERLAGE"), so both shapes are
     /// matched as a blue and as a red mask. Banners score 0.95-0.97; other frames at most 0.62 (all samples, REDSEC and rounds).</summary>
     public static readonly Cue MpEndShield = new("mp_end_shield", "mp_end_shield_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
 
@@ -58,6 +63,9 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
 
     /// <inheritdoc cref="MpEndShield"/>
     public static readonly Cue MpEndFlag = new("mp_end_flag", "mp_end_flag_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
+
+    /// <inheritdoc cref="MpEndShield"/>
+    public static readonly Cue MpEndBurst = new("mp_end_burst", "mp_end_burst_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
 
     public const int ReferenceHeight = 1440;
 
