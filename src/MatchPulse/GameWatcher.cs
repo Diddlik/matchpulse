@@ -58,6 +58,7 @@ public static class GameWatcher
             var nextNameRead = DateTimeOffset.MinValue;
             var inMatch = false;
             var paused = false;
+            var warnedNoPicture = false;
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 // Paused (Config.Active off): no capture and no Game Events; a running Match ends with reason "stopped".
@@ -81,7 +82,8 @@ public static class GameWatcher
                 try
                 {
                     var nextCheck = DateTimeOffset.MinValue;
-                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, [MatchNames.Region, .. snapshots is null ? [] : DiagnosticSnapshots.Regions], () => pictures.Wanted))
+                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, [MatchNames.Region, .. snapshots is null ? [] : DiagnosticSnapshots.Regions], () => pictures.Wanted,
+                        () => GetForegroundWindow() == window))
                         using (frame.Image)
                         {
                             if (!config().Active) break;
@@ -115,6 +117,15 @@ public static class GameWatcher
                             }
                             nextCheck = frame.Timestamp + TimeSpan.FromSeconds(1);
                         }
+                }
+                catch (TimeoutException e)
+                {
+                    // Once per game run; the capture keeps restarting quietly.
+                    if (!warnedNoPicture)
+                        log.LogWarning("No picture from monitor {Monitor} for {Seconds} s while bf6.exe is in front ({Reason}); capture restarts. Exclusive fullscreen hides the game from screen capture: use borderless",
+                            monitor, LiveFrameSource.NoPictureAfter.TotalSeconds, e.Message);
+                    warnedNoPicture = true;
+                    stop.WaitHandle.WaitOne(Poll);
                 }
                 catch (Exception e)
                 {
@@ -173,6 +184,9 @@ public static class GameWatcher
     }
 
     const uint MonitorDefaultToNearest = 2;
+
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
     static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);

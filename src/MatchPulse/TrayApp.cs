@@ -216,6 +216,8 @@ sealed class TrayApp : ApplicationContext
         if (!Config.NotifyOnProblems) return;
         _balloonPage = page;
         _tray.ShowBalloonTip(5000, "MatchPulse", Ui.T(Config.UiLanguage, key), ToolTipIcon.Warning);
+        // Over the game, where the tray notice is not seen while playing.
+        if (key == "NoPicture") Overlay.Show(Ui.T(Config.UiLanguage, key), Color.FromArgb(240, 136, 62), TimeSpan.FromSeconds(8));
     }
 
     void RefreshTray()

@@ -73,7 +73,7 @@ Jede Nachricht ist `{ "type": "…", "payload": … }`. Zeiten sind ISO 8601 mit
 | `pluginStatus` | `{ id, status }` | Verbindungsänderung eines Plugins |
 | `settings` | Einstellungen | wenn sie sich außerhalb der UI ändern |
 | `diagnostics` | Liste der Fälle | neuer Fall, Ordner geleert |
-| `hostProblems` | `["capture_failed", "config_invalid"]` | wenn sich Probleme ändern |
+| `hostProblems` | `["capture_failed", "no_picture", "config_invalid"]` | wenn sich Probleme ändern |
 | `log` | Liste von Log-Zeilen | neue Zeilen |
 | `navigate` | `{ page }` | z. B. Klick auf Windows-Benachrichtigung → `"sinks"` |
 

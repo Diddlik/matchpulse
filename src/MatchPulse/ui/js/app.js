@@ -85,6 +85,7 @@
     S.plugins.filter((p) => p.enabled && p.status === 'ruleFailed').forEach((p) => list.push({ title: t('p_rule', { n: t('pl_' + p.id) }), detail: p.lastError || '', act: 'go', arg: 'plugins', action: t('to_plugins') }));
     (S.hostProblems || []).forEach((c) => {
       if (c === 'capture_failed') list.push({ title: t('p_capture'), detail: t('p_capture_d'), act: 'go', arg: 'log', action: t('to_log') });
+      if (c === 'no_picture') list.push({ title: t('p_nopicture'), detail: t('p_nopicture_d'), act: 'go', arg: 'log', action: t('to_log') });
       if (c === 'config_invalid') list.push({ title: t('p_config'), detail: t('p_config_d') });
     });
     return list;

@@ -92,6 +92,7 @@ public sealed class UiHub : IEventSink
             if (!running) _match = null;
             else _since = DateTimeOffset.Now;
             _problems.Remove("capture_failed");
+            _problems.Remove("no_picture");
         }
         Send("state", State());
         Send("hostProblems", Problems());
@@ -179,6 +180,16 @@ public sealed class UiHub : IEventSink
             {
                 Send("hostProblems", Problems());
                 Problem?.Invoke("CaptureFailed", "log");
+            }
+        }
+        if (message.StartsWith("No picture from monitor", StringComparison.Ordinal))
+        {
+            bool added;
+            lock (_lock) added = _problems.Add("no_picture");
+            if (added)
+            {
+                Send("hostProblems", Problems());
+                Problem?.Invoke("NoPicture", "log");
             }
         }
         if (message.StartsWith("Diagnostic snapshot ", StringComparison.Ordinal)) Send("diagnostics", Diagnostics());

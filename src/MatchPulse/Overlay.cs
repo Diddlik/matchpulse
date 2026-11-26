@@ -16,10 +16,12 @@ sealed class Overlay : Form
     readonly string _text;
     readonly Color _accent;
     readonly System.Windows.Forms.Timer _timer = new() { Interval = 30 };
+    readonly int _visibleTicks;
     int _ticks;
 
-    Overlay(string text, Color accent)
+    Overlay(string text, Color accent, TimeSpan visible)
     {
+        _visibleTicks = (int)(visible.TotalMilliseconds / _timer.Interval);
         _text = text;
         _accent = accent;
         FormBorderStyle = FormBorderStyle.None;
@@ -38,11 +40,11 @@ sealed class Overlay : Form
         _timer.Tick += (_, _) => Fade();
     }
 
-    /// <summary>Shows the notice, replacing one still on screen.</summary>
-    public static void Show(string text, Color accent)
+    /// <summary>Shows the notice for <paramref name="visible"/> (default 1.5 s), replacing one still on screen.</summary>
+    public static void Show(string text, Color accent, TimeSpan? visible = null)
     {
         _current?.Close();
-        _current = new Overlay(text, accent);
+        _current = new Overlay(text, accent, visible ?? TimeSpan.FromSeconds(1.5));
         _current.Show();
         _current._timer.Start();
     }
@@ -59,10 +61,10 @@ sealed class Overlay : Form
         }
     }
 
-    // Visible for about 1.5 s, then fades out over about 0.4 s.
+    // Visible, then fades out over about 0.4 s.
     void Fade()
     {
-        if (++_ticks < 50) return;
+        if (++_ticks < _visibleTicks) return;
         Opacity -= 0.07;
         if (Opacity > 0.05) return;
         _timer.Stop();
