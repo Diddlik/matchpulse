@@ -4,11 +4,11 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Fixture test: `kill_jammer_1119-2047` yields one `kill` (with a Match already started), and its Knockdown Badge yields none
 - [x] Fixture test: `knock_squad-finishes` and `squad-kill-wipes-players-knock` yield no `kill`
-- [ ] Fixture test: two Kills in quick succession produce two `kill` events (find or cut a clip from `samples/` if none exists)
+- [x] Fixture test: two Kills in quick succession produce two `kill` events: `mp_double-kill_tdm-1124` (kills 2.9 s apart, multiplayer) and `kill_then-wipe-credit_1105-2139` (knockdown, which is a Kill since 0.6.3, and a Kill 0.9 s apart, REDSEC)
 - [x] Counter flash fallback: a flash within about 1 s after a Kill Marker, with no Kill Badge seen, produces one `kill`; a flash without a preceding Kill Marker produces none; a flash with a Kill Badge does not produce a second `kill`
 - [x] With the counter flash Cue disabled, all Kill Badge fixtures still pass
 
@@ -23,3 +23,4 @@
 - Possible miss under a Jammer: in `2026-11-19 22-29-57` at about 467.8 s, during the Jammer gap, a Kill Badge appears 3.2 s after a knockdown's Kill Marker, with no Kill Marker in between. It cannot be checked because the Kill Feed is hidden. If it is the Player's own finish, it is missed today.
 - For 04: the Kill Marker, Kill Badge and counter flash state now lives in `MatchDetector`. When Match boundaries arrive, reset it per Match, and keep a pending flash `kill` from carrying over into the next Match. Kill detection never uses the in-match HUD Cue. The counter flash shares the HUD search band (0.742, 0.042, 0.258, 0.059).
 - For 07: the new Cues `kill_marker` (mask template, 200×200 at 2560×1440) and `kill_counter_flash` need scaling, as `kill_badge` does. The red and green HSV bands are fixed in `MatchDetector` and do not depend on language.
+- 2026-11-26: Closed. The quick double Kill is covered by the two fixtures above. The known limit "the detector remembers only the last Kill Marker" is gone: `MatchDetector` keeps a list of unused Kill Markers (`_killMarkers`).

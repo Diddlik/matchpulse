@@ -4,9 +4,9 @@
 
 **Blocked by:** 09
 
-**Status:** needs-info
+**Status:** ready-for-agent
 
-- [ ] Recording of a round end with its end screen (a victory and a defeat) and the start of the next round
+- [x] Recording of a round end with its end screen (a victory and a defeat) and the start of the next round (see the 2026-11-26 comment)
 - [ ] Start Cue, for example the ticket bar at the top centre with the flags
 - [ ] End Cues from the multiplayer end screen
 - [ ] Fixture clips for start, victory and defeat
@@ -17,3 +17,10 @@
 Postponed by the Player on 2026-11-23. Needs a capture that spans a round end and the next round start; MatchPulse can record it live while the Player plays.
 - 2026-11-24: `samples/2026-11-24 19-58-16.mkv` holds a whole Team Deathmatch round: menu, briefing, spawn, play, defeat banner "NIEDERLAGE" at 11:44 and the end screen with "NIEDERLAGE" top right. No victory and no Conquest end yet.
 - 2026-11-26: Ticket 25 reads the lobby header (mode and map) with Windows OCR and sends them in `match_started`; multiplayer lobbies are already read, so a multiplayer `match_started` gets them once its start Cue exists.
+- 2026-11-26: The samples from 2026-11-25 hold six whole multiplayer rounds with their ends (times in s, from contact sheets every 2 s; refine when cutting clips):
+  - Conquest victory: `2026-11-25 23-04-39`, "DER SIEG STEHT KURZ BEVOR" at about 1402, banner "SIEG" (blue emblem) at about 1422, end screen "SIEG" with 461 : 1000 → 230 : 0 at about 1428. The recording starts on the end screen of the round before, and the next round's HUD appears at about 300: a round end followed by a round start.
+  - Conquest defeat: `2026-11-25 21-24-53`, banner "NIEDERLAGE" at about 510, end screen at about 540.
+  - Team Deathmatch defeats: `2026-11-25 20-27-52` (banner about 664, end screen 076 : 100 about 668), `2026-11-25 20-39-41` (banner about 676, end screen 075 : 100 about 682), `2026-11-25 20-52-39` (banner about 774, end screen 097 : 100 about 782), `2026-11-24 19-58-16` (banner at 11:44).
+  - Round starts after the briefing: `20-27-52` about 60, `20-39-41` about 90, `20-52-39` about 30, `23-04-39` about 300.
+  - The multiplayer banner emblems differ from REDSEC (blue emblem for SIEG, red hexagon for NIEDERLAGE, not the gold laurel and the red shield), so new end Cues are needed. No Team Deathmatch victory yet; the Conquest one may serve if the banner is the same.
+  - Watch out: inside a Match the detector runs the REDSEC Knockdown Badge and death Cues, and the plain multiplayer kill skull scores about 0.87 against the Knockdown Badge. A multiplayer Match must not turn those on (ticket 20).
