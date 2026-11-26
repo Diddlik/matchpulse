@@ -45,6 +45,19 @@ public sealed class MatchDetector
     // A Knockdown Badge after a Kill Marker is held until that marker's window closes: when a Kill Badge takes the
     // same marker, the Score Popup only queued it behind the Kill Badge's credit (seen under a Jammer), so no knockdown.
     (DateTimeOffset At, DateTimeOffset KillMarker)? _pendingKnockdown;
+    DateTimeOffset? _killBadgeAt; // the last Kill Badge, counted or not
+    bool _knockdownBadgesSeenEmpty;
+
+    // REDSEC: the Player's knockdown is the Player's kill, sent at that moment with the knockdown. The later Kill Badge
+    // of that opponent (the Player finishing it, the Squad finishing it, or it bleeding out) then sends nothing.
+    // An opponent revived meanwhile leaves its knockdown open, so it is forgotten after a while.
+    // A kill by the Player while a knockdown is open is held for the Kill Marker window: killing an opponent outright
+    // wipes its Squad, so when a Kill Badge credit without a Kill Marker follows (the knocked opponent dying in the
+    // wipe), the held kill was another opponent and is sent, unless two knockdowns are open: then the Player finished
+    // one and the other died in the wipe (2026-11-25 22-28-19 at 701 s). Otherwise it finished the knockdown.
+    static readonly TimeSpan OpenKnockdownFor = TimeSpan.FromSeconds(60); // a knocked opponent was finished 34 s later
+    readonly List<DateTimeOffset> _openKnockdowns = [];
+    DateTimeOffset? _pendingFinish;
 
     // Death: the spectate label, once per elimination; it may flicker while the camera changes Squad members.
     static readonly TimeSpan DeathRearm = TimeSpan.FromSeconds(5);
@@ -124,18 +137,23 @@ public sealed class MatchDetector
 
     void Knockdowns(Frame frame, List<GameEvent> events)
     {
-        if (_knockdownBadges.Update(CountBadges(frame.Image, Cue.KnockdownBadge, _knockdownBadge), frame.Timestamp) is { } knock)
+        var badges = CountBadges(frame.Image, Cue.KnockdownBadge, _knockdownBadge);
+        if (badges == 0) _knockdownBadgesSeenEmpty = true;
+        if (_knockdownBadges.Update(badges, frame.Timestamp) is { } knock)
         {
             _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", Cue.KnockdownBadge.Name, knock.Count, knock.At);
             var marker = _killMarkers.FindLastIndex(m => knock.At - m <= KillMarkerWindow && m != _pendingKnockdown?.KillMarker && m != _pendingFlash?.KillMarker);
-            if (marker >= 0)
+            // Without a Kill Marker it is still the Player's knockdown: its marker is often red for only 2-3 video frames,
+            // between two checks. The window then runs from the badge itself. Not when it joins a Kill Badge just shown,
+            // nor when it was already showing as the Match started (watching began mid-Match).
+            if (marker >= 0 || (_knockdownBadgesSeenEmpty && !(knock.At - _killBadgeAt <= KillMarkerWindow)))
             {
-                if (_pendingKnockdown is { } older) events.Add(EmitKnockdown(older));
-                _pendingKnockdown = (knock.At, _killMarkers[marker]);
+                if (_pendingKnockdown is { } older) EmitKnockdown(older, events);
+                _pendingKnockdown = (knock.At, marker >= 0 ? _killMarkers[marker] : knock.At);
             }
         }
         if (_pendingKnockdown is { } pending && frame.Timestamp > pending.KillMarker + KillMarkerWindow)
-            events.Add(EmitKnockdown(pending));
+            EmitKnockdown(pending, events);
     }
 
     void Death(Frame frame, List<GameEvent> events)
@@ -193,6 +211,7 @@ public sealed class MatchDetector
         if (_killBadges.Update(badges, frame.Timestamp, rearmAfterDip: multiplayer) is { } rise)
         {
             var at = rise.At;
+            _killBadgeAt = at;
             _log.LogInformation("Cue {Cue} seen: {Count} in Score Popup at {At:O}", badge.Name, rise.Count, at);
             var marker = _killMarkers.FindLastIndex(m => at - m <= KillMarkerWindow);
             if (marker >= 0 || _killMarkerBands is null || (multiplayer && at == _popupOpenedAt))
@@ -201,14 +220,24 @@ public sealed class MatchDetector
                 if (_pendingKnockdown is { } knock)
                 {
                     if (knock.KillMarker == markerAt) _pendingKnockdown = null; // queued credit, not a knockdown of its own
-                    else events.Add(EmitKnockdown(knock)); // an earlier knockdown of the opponent now finished
+                    else EmitKnockdown(knock, events); // an earlier knockdown of the opponent now finished
                 }
-                events.Add(EmitKill(at));
+                ConfirmedKill(at, events);
                 if (markerAt is { } used) _killMarkers.Remove(used);
                 _pendingFlash = null;
                 _badgeKillAt = at;
             }
-            else Unconfirmed?.Invoke("kill_badge_without_kill_marker", at);
+            else
+            {
+                if (_pendingFinish is { } held)
+                {
+                    if (_openKnockdowns.Count >= 2) FinishKnockdown(held);
+                    else events.Add(EmitKill(held));
+                    _pendingFinish = null;
+                }
+                if (_openKnockdowns.Count > 0) _openKnockdowns.RemoveAt(0);
+                Unconfirmed?.Invoke("kill_badge_without_kill_marker", at);
+            }
         }
 
         if (_flash.Update(KillCounterFlashes(frame.Image), frame.Timestamp) is { } flashAt)
@@ -220,7 +249,9 @@ public sealed class MatchDetector
         }
 
         if (_pendingFlash is { } flash && frame.Timestamp > flash.KillMarker + KillMarkerWindow)
-            events.Add(EmitPendingFlash(flash));
+            EmitPendingFlash(flash, events);
+        if (_pendingFinish is { } finish && frame.Timestamp > finish + KillMarkerWindow) FinishKnockdown(finish);
+        _openKnockdowns.RemoveAll(k => frame.Timestamp - k > OpenKnockdownFor);
 
         foreach (var expired in _killMarkers.Where(m => frame.Timestamp - m > KillMarkerWindow && _pendingFlash?.KillMarker != m && _pendingKnockdown?.KillMarker != m).ToList())
         {
@@ -261,14 +292,19 @@ public sealed class MatchDetector
         _flash.Reset();
         _pendingFlash = null;
         _badgeKillAt = null;
+        _killBadgeAt = null;
+        _knockdownBadgesSeenEmpty = false;
+        _openKnockdowns.Clear();
+        _pendingFinish = null;
     }
 
     // A held knockdown or kill counter flash belongs to the Match that ends, so it is sent before match_ended.
     List<GameEvent> EndMatch(DateTimeOffset at, string result, string reason)
     {
         List<GameEvent> events = [];
-        if (_pendingKnockdown is { } knock) events.Add(EmitKnockdown(knock));
-        if (_pendingFlash is { } flash) events.Add(EmitPendingFlash(flash));
+        if (_pendingKnockdown is { } knock) EmitKnockdown(knock, events);
+        if (_pendingFlash is { } flash) EmitPendingFlash(flash, events);
+        if (_pendingFinish is { } finish) FinishKnockdown(finish);
         events.Add(Emit("match_ended", at, new() { ["result"] = result, ["reason"] = reason, ["kills"] = Count(_kills) }));
         _matchId = null;
         _hud.Reset();
@@ -276,21 +312,39 @@ public sealed class MatchDetector
         return events;
     }
 
-    GameEvent EmitPendingFlash((DateTimeOffset At, DateTimeOffset KillMarker) flash)
+    void EmitPendingFlash((DateTimeOffset At, DateTimeOffset KillMarker) flash, List<GameEvent> events)
     {
         _pendingFlash = null;
         _killMarkers.Remove(flash.KillMarker);
-        return EmitKill(flash.At);
+        ConfirmedKill(flash.At, events);
+    }
+
+    void ConfirmedKill(DateTimeOffset at, List<GameEvent> events)
+    {
+        if (_pendingFinish is { } older) FinishKnockdown(older);
+        if (_openKnockdowns.Count > 0) _pendingFinish = at;
+        else events.Add(EmitKill(at));
+    }
+
+    // The kill of an opponent the Player knocked down was already sent with the knockdown.
+    void FinishKnockdown(DateTimeOffset at)
+    {
+        _pendingFinish = null;
+        if (_openKnockdowns.Count == 0) return;
+        _log.LogInformation("Kill at {At:O} finishes the knockdown at {Knockdown:O}, already sent as a kill", at, _openKnockdowns[0]);
+        _openKnockdowns.RemoveAt(0);
     }
 
     GameEvent EmitKill(DateTimeOffset at) => Emit("kill", at, new() { ["kills"] = Count(++_kills) });
 
-    GameEvent EmitKnockdown((DateTimeOffset At, DateTimeOffset KillMarker) knock)
+    void EmitKnockdown((DateTimeOffset At, DateTimeOffset KillMarker) knock, List<GameEvent> events)
     {
         _pendingKnockdown = null;
         _killMarkers.Remove(knock.KillMarker);
+        _openKnockdowns.Add(knock.At);
         _log.LogInformation("Knockdown at {At:O}", knock.At);
-        return Emit("knockdown", knock.At);
+        events.Add(Emit("knockdown", knock.At));
+        events.Add(EmitKill(knock.At));
     }
 
     static string Count(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);

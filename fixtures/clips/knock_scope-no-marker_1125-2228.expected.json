@@ -1,0 +1,30 @@
+{
+  "clip": "knock_scope-no-marker_1125-2228.mkv",
+  "source": {
+    "recording": "2026-11-25 22-28-19.mkv (REDSEC trios, 60 fps)",
+    "start": 220.5,
+    "duration": 4
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.7,
+      "data": {}
+    },
+    {
+      "type": "knockdown",
+      "offset": 2.7,
+      "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 2.7,
+      "data": {
+        "kills": "1"
+      }
+    }
+  ],
+  "notes": "Player knocks an opponent through a sniper scope. The Kill Marker is red for only 4 frames of the 60 fps source (~2.08-2.15 s), two of them under the red hit flash, so 10 checks per second miss it. Knockdown Badge (skull with down arrow, 300 points) from ~2.6 s. The game credits the kill ('KILL BESTÄTIGT') about 17 s later, after the clip: no kill, the Squad finished him. The Player's knockdown is the Player's kill: kill with the knockdown."
+}

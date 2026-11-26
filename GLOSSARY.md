@@ -21,11 +21,11 @@ The Player's teammates in a Match. Their actions are not reported as the Player'
 _Avoid_: team, party
 
 **Kill**:
-The Player finishing off an opponent, in any game mode. A Kill outside a Match (regular multiplayer) belongs to no Match.
+The Player taking an opponent out, in any game mode. In REDSEC that is the moment the Player knocks the opponent down; who finishes him later (the Player, the Squad, bleeding out) adds no further Kill. An opponent killed outright, without a downed state, is a Kill at that moment. A Kill outside a Match (regular multiplayer) belongs to no Match.
 _Avoid_: elimination, frag
 
 **Knockdown**:
-The Player putting an opponent into the downed state without killing him. Finishing him later is a Kill of its own.
+The Player putting an opponent into the downed state (REDSEC). It is also the Player's Kill of that opponent, reported at the same moment.
 _Avoid_: down, knock
 
 **Death**:

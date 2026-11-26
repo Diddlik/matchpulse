@@ -27,18 +27,67 @@ public class KillDetectionTests
     }
 
     [Fact]
-    public void Knockdown_Badge_after_a_Kill_Marker_yields_a_knockdown_and_no_kill()
+    public void Knockdown_Badge_after_a_Kill_Marker_yields_a_knockdown_and_a_kill_at_once()
     {
         var events = Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(5));
 
-        var knockdown = Assert.Single(events);
-        Assert.Equal(("knockdown", Start.AddMilliseconds(500)), (knockdown.Type, knockdown.OccurredAt));
+        Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
+        Assert.All(events, e => Assert.Equal(Start.AddMilliseconds(500), e.OccurredAt));
+        Assert.Equal("1", events[1].Data["kills"]);
     }
 
     [Fact]
-    public void Knockdown_Badge_without_a_Kill_Marker_yields_nothing()
+    public void Squad_finishing_the_Players_knockdown_yields_no_second_kill()
     {
-        Assert.Empty(Run(Blank(3), WithBadges(20, "knockdown_badge"), Blank(5)));
+        var events = Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(20), WithBadges(20, "kill_badge"), Blank(5));
+
+        Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
+    }
+
+    [Fact]
+    public void Kill_wiping_a_Squad_after_one_knockdown_yields_a_kill_of_its_own()
+    {
+        // The Player knocks one opponent, kills the last of his Squad outright, the knocked one dies in the wipe.
+        var events = Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(20), KillMarker(2), WithBadges(3, "kill_badge"), WithBadges(20, "kill_badge", "kill_badge"), Blank(20));
+
+        Assert.Equal(["knockdown", "kill", "kill"], events.Select(e => e.Type));
+    }
+
+    [Fact]
+    public void Finishing_one_of_two_knockdowns_wiping_the_Squad_yields_no_further_kill()
+    {
+        // The Player knocks two opponents, finishes one, the other dies in the wipe.
+        var events = Run(Blank(3), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(20), KillMarker(2), WithBadges(20, "knockdown_badge"), Blank(20),
+            KillMarker(2), WithBadges(3, "kill_badge"), WithBadges(20, "kill_badge", "kill_badge"), Blank(20));
+
+        Assert.Equal(["knockdown", "kill", "knockdown", "kill"], events.Select(e => e.Type));
+    }
+
+    [Fact]
+    public void Knockdown_Badge_without_a_Kill_Marker_yields_a_knockdown()
+    {
+        // The Kill Marker of a knockdown can be red for only 2-3 video frames, between two checks.
+        var events = Run(Blank(3), WithBadges(20, "knockdown_badge"), Blank(20));
+
+        Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
+        Assert.All(events, e => Assert.Equal(Start.AddMilliseconds(300), e.OccurredAt));
+    }
+
+    [Fact]
+    public void Knockdown_Badge_joining_a_Kill_Badge_without_a_Kill_Marker_yields_only_the_kill()
+    {
+        var events = Run(Blank(3), KillMarker(2), WithBadges(3, "kill_badge"), WithBadges(20, "kill_badge", "knockdown_badge"), Blank(20));
+
+        Assert.Equal(["kill"], events.Select(e => e.Type));
+    }
+
+    [Fact]
+    public void Knockdown_Badge_without_a_Kill_Marker_then_finishing_yields_the_kill_at_the_knockdown()
+    {
+        var events = Run(Blank(3), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"), Blank(20));
+
+        Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
+        Assert.All(events, e => Assert.Equal(Start.AddMilliseconds(300), e.OccurredAt));
     }
 
     [Fact]
@@ -51,12 +100,12 @@ public class KillDetectionTests
     }
 
     [Fact]
-    public void Knockdown_then_finishing_the_opponent_yields_knockdown_then_kill()
+    public void Knockdown_then_finishing_the_opponent_yields_the_kill_at_the_knockdown()
     {
         var events = Run(KillMarker(2), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"), Blank(20));
 
         Assert.Equal(["knockdown", "kill"], events.Select(e => e.Type));
-        Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(1200)], events.Select(e => e.OccurredAt));
+        Assert.Equal([Start.AddMilliseconds(200), Start.AddMilliseconds(200)], events.Select(e => e.OccurredAt));
         Assert.Equal([2, 3], events.Select(e => e.Sequence));
         Assert.Equal("1", events[1].Data["kills"]);
     }
@@ -79,7 +128,7 @@ public class KillDetectionTests
     {
         var events = Run(KillMarker(2), WithBadges(8, "knockdown_badge"), KillMarker(2), WithBadges(10, "knockdown_badge", "kill_badge"));
 
-        Assert.Equal(Start.AddMilliseconds(1200), Assert.Single(events, e => e.Type == "kill").OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(200), Assert.Single(events, e => e.Type == "kill").OccurredAt);
     }
 
     [Fact]
@@ -143,7 +192,7 @@ public class KillDetectionTests
         // The knockdown's Kill Marker is still unused when the flash for the Kill Badge kill arrives.
         var events = Run(KillMarker(2), WithBadges(3, "knockdown_badge"), KillMarker(2), WithBadges(3, "knockdown_badge", "kill_badge"), KillCounterFlash(6), Blank(20));
 
-        Assert.Equal(Start.AddMilliseconds(700), Assert.Single(events, e => e.Type == "kill").OccurredAt);
+        Assert.Equal(Start.AddMilliseconds(200), Assert.Single(events, e => e.Type == "kill").OccurredAt);
     }
 
     [Fact]

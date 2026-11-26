@@ -43,7 +43,7 @@ MatchPulse does not touch the game. It only copies small areas of the screen, th
 ### Telling your kills apart
 
 <p align="center">
-  <img src="docs/images/kill-rule.svg" width="100%" alt="Your kill: the red X around the crosshair, then within 1.5 seconds the skull in the score popup, gives a kill event. Your knockdown: the X, then the skull with an arrow, gives a knockdown event. Squad finished it: the skull without your X gives no event.">
+  <img src="docs/images/kill-rule.svg" width="100%" alt="Your kill: the red X around the crosshair, then within 1.5 seconds the skull in the score popup, gives a kill event. Your knockdown: the X, then the skull with an arrow, gives a knockdown and a kill event. Squad finished it: the skull without your X gives no event.">
 </p>
 
 The hit marker X appears on every hit that downs or kills, and the game shows the kill skull also when your Squad finishes an opponent you knocked down. Only your X followed by the skull counts as your kill. The X colour can be changed in the game, so you set the same colour in MatchPulse.
@@ -83,8 +83,8 @@ Every event is a JSON object, the same for every target:
 | `type` | When | `data` |
 |---|---|---|
 | `match_started` | a REDSEC match begins | – |
-| `kill` | you kill an opponent | `kills`: your kills in this match so far |
-| `knockdown` | you knock an opponent down (REDSEC) | – |
+| `kill` | you kill an opponent; in REDSEC already when you knock him down (finishing him later adds no second kill) | `kills`: your kills in this match so far |
+| `knockdown` | you knock an opponent down (REDSEC), together with its `kill` | – |
 | `death` | you are eliminated and spectate (REDSEC, German game language so far) | – |
 | `match_ended` | victory or defeat screen, game closed, or the HUD gone for 2 minutes | `result`: `victory`, `defeat`, `unknown`; `reason`: `end_screen`, `hud_lost`, `game_exited`, `stopped`; `kills` |
 

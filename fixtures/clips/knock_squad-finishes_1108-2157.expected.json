@@ -17,7 +17,14 @@
       "type": "knockdown",
       "offset": 1.1,
       "data": {}
+    },
+    {
+      "type": "kill",
+      "offset": 1.1,
+      "data": {
+        "kills": "1"
+      }
     }
   ],
-  "notes": "Player knocks Max Veltro (Kill Marker at 1.1 s, Kill Feed '▸BulletWaltz [weapon] [chevron] Max Veltro'). Squad member 'Salami taste' finishes him at ~7.4 s. The game then credits the Player: kill counter 0->1 with green flash at 7.5 s and the popup 'KILL BESTÄTIGT'. Per the spec (Kill = Player finishing) this is a Squad kill and yields no kill; OPEN QUESTION for the Player whether a confirmed kill credit should count. Knockdown (ticket 19): Kill Marker at 1.1 s, Knockdown Badge at 1.6 s; the Squad then finishes him, so a knockdown but no kill."
+  "notes": "Player knocks Max Veltro (Kill Marker at 1.1 s, Kill Feed '▸BulletWaltz [weapon] [chevron] Max Veltro'). Squad member 'Salami taste' finishes him at ~7.4 s. The game then credits the Player: kill counter 0->1 with green flash at 7.5 s and the popup 'KILL BESTÄTIGT'. Per the spec (Kill = Player finishing) this is a Squad kill and yields no kill; OPEN QUESTION for the Player whether a confirmed kill credit should count. Knockdown (ticket 19): Kill Marker at 1.1 s, Knockdown Badge at 1.6 s; the Squad then finishes him, so a knockdown but no kill. The Player's knockdown is the Player's kill: kill with the knockdown at 1.1 s; the Squad's finish at 7.4 s sends nothing."
 }

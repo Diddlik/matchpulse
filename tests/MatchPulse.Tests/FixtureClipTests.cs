@@ -16,9 +16,7 @@ public class FixtureClipTests
 
     // Known miss on the English third-party footage (see ticket 07's comments): its defeat emblem shows
     // another player's cosmetic badge inside the shield.
-    static readonly string[] KnownMisses = ["en_defeat_redsec-en2",
-        // Its knockdown Kill Marker is red for a single video frame, between two checks (see the clip's notes).
-        "kill_knock-then-finish_1105-2236"];
+    static readonly string[] KnownMisses = ["en_defeat_redsec-en2"];
 
     static IEnumerable<string> ClipNames() =>
         Directory.GetFiles(Clips, "*.expected.json").Select(f => Path.GetFileName(f)[..^".expected.json".Length]).Except(KnownMisses);
@@ -121,9 +119,8 @@ public class FixtureClipTests
     public static TheoryData<string> ClipsAt1440p() => new(ClipNames().Where(c => !c.StartsWith("en_")));
 
     [Theory]
-    [InlineData("kill_knock-then-finish_1105-2236", 2.4)] // Kill Marker at 1.2 s, Knockdown Badge from 1.7 s
     [InlineData("kill_jammer_1119-2047", 2.2)] // Knockdown Badge from 1.5 s under a Jammer
-    public void Knockdown_and_Kill_Marker_before_the_Kill_Badge_yield_no_kill(string clip, double until)
+    public void Knockdown_Badge_queued_behind_a_Kill_Badge_yields_no_kill_of_its_own(string clip, double until)
     {
         Assert.DoesNotContain(Replay(clip, until), e => e.Type == "kill");
     }
