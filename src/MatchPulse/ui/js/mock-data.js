@@ -53,7 +53,8 @@
     ],
     settings: {
       gameLanguage: 'de', uiLanguage: 'de', theme: 'system', killMarkerColor: '#FF3030',
-      checksPerSecond: 10, matchEndWithoutHudSeconds: 120, active: true, toggleHotkey: 'Ctrl+Alt+M', diagnosticMode: true, notifyOnProblems: true, liveMonitor: false
+      checksPerSecond: 10, matchEndWithoutHudSeconds: 120, active: true, toggleHotkey: 'Ctrl+Alt+M', diagnosticMode: true, notifyOnProblems: true, liveMonitor: false,
+      matchNames: ['RAPID ROYALE – TRIOS', 'MIRAK-TAL: FLUSSUFER']
     },
     // Kill-Highlights für den Live-Monitor. imageUrl = null zeigt den Platzhalter.
     highlights: [

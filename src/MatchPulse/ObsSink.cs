@@ -170,12 +170,15 @@ public static class ObsTemplate
 {
     /// <summary>{kills} the Player's kills so far in the Match (outside a Match: since the last one; from <c>data.kills</c> of
     /// kill and match_ended, 0 otherwise), {n} the event's sequence,
-    /// {match} the first 8 characters of the matchId (or "mp"), {result} of a match_ended, {date} and {time} of the event.</summary>
+    /// {match} the first 8 characters of the matchId (or "mp"), {result} of a match_ended, {mode} and {map} of a match_started (the Match Name),
+    /// {date} and {time} of the event.</summary>
     public static string Fill(string template, GameEvent e) => template
         .Replace("{kills}", Kills(e))
         .Replace("{n}", e.Sequence.ToString(CultureInfo.InvariantCulture))
         .Replace("{match}", e.MatchId is { } id ? id[..Math.Min(8, id.Length)] : "mp")
         .Replace("{result}", e.Data.GetValueOrDefault("result", ""))
+        .Replace("{mode}", e.Data.GetValueOrDefault("mode", ""))
+        .Replace("{map}", e.Data.GetValueOrDefault("map", ""))
         .Replace("{date}", e.OccurredAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
         .Replace("{time}", e.OccurredAt.ToString("HH-mm-ss", CultureInfo.InvariantCulture));
 

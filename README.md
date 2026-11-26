@@ -82,7 +82,7 @@ Every event is a JSON object, the same for every target:
 
 | `type` | When | `data` |
 |---|---|---|
-| `match_started` | a REDSEC match begins | – |
+| `match_started` | a REDSEC match begins | `mode`, `map`: the Match Name read in the lobby (missing when none was read) |
 | `kill` | you kill an opponent; in REDSEC already when you knock him down (finishing him later adds no second kill) | `kills`: your kills in this match so far |
 | `knockdown` | you knock an opponent down (REDSEC), together with its `kill` | – |
 | `death` | you are eliminated and spectate (REDSEC, German game language so far) | – |
@@ -138,7 +138,9 @@ MatchPulse controls OBS directly over **OBS WebSocket** (built into OBS 28 and l
 | Switch scene, set text, show a source for N seconds | overlays: kill counter, kill animation |
 | Start / stop stream | |
 
-Every rule can wait a few seconds first — for example, save the replay buffer 3 s after a kill, so the moment after it is in the clip. Placeholders: `{kills}`, `{match}`, `{n}`, `{result}`, `{date}`, `{time}`.
+Every rule can wait a few seconds first — for example, save the replay buffer 3 s after a kill, so the moment after it is in the clip. Placeholders: `{kills}`, `{match}`, `{n}`, `{result}`, `{mode}`, `{map}`, `{date}`, `{time}`.
+
+**Match names.** Before a match, MatchPulse reads the mode and map from the lobby (top left) with the OCR built into Windows, in the game language. New names appear under Settings → Match names, one per line; correct a misreading there, and later reads that are nearly the same are replaced by your spelling.
 
 **Highlight video**: turn on *Create a highlight video after each match* in the OBS plugin. With a rule like *kill → save replay buffer*, MatchPulse takes the last N seconds (default 10) of every replay saved in the match and joins them into `Highlights <date> <time>` in the replay folder. Replays that overlap are used once. It needs [ffmpeg](https://ffmpeg.org) on the PATH (`winget install Gyan.FFmpeg`) and OBS on the same PC. Cuts are made without re-encoding, so they fall on keyframes.
 

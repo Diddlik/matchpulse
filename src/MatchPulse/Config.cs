@@ -9,6 +9,7 @@ namespace MatchPulse;
 /// <c>killMarkerColor</c> is the Kill Marker colour set in the game settings, as <c>#RRGGBB</c>.
 /// <c>"liveMonitor": true</c> saves a full-screen picture of each kill (see <see cref="KillPictures"/>).
 /// <c>"diagnostics": true</c> saves a snapshot of every unconfirmed Kill case (see <see cref="DiagnosticSnapshots"/>).
+/// <c>matchNames</c>: the Match Names (modes and maps) known so far; a name read is replaced by a known one nearly the same (see <see cref="MatchNames"/>).
 /// Each script is a command line run through <c>cmd.exe /s /c "command"</c> once per Game Event.
 /// </summary>
 public sealed record Config(
@@ -32,7 +33,8 @@ public sealed record Config(
     SoundSettings? Sound = null,
     OverlaySettings? Overlay = null,
     bool Active = true,
-    string ToggleHotkey = "Ctrl+Alt+M")
+    string ToggleHotkey = "Ctrl+Alt+M",
+    IReadOnlyList<string>? MatchNames = null)
 {
     public static readonly string DefaultPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MatchPulse", "config.json");
@@ -43,6 +45,8 @@ public sealed record Config(
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public IReadOnlyList<string> Scripts { get; init; } = Scripts ?? [];
+
+    public IReadOnlyList<string> MatchNames { get; init; } = MatchNames ?? [];
 
     public ObsSettings Obs { get; init; } = Obs ?? new ObsSettings();
 
@@ -82,6 +86,7 @@ public sealed record Config(
         if (ChecksPerSecond is < 5 or > 10)
             throw new InvalidDataException($"{path}: \"checksPerSecond\" must be between 5 and 10.");
         if (Scripts.Any(string.IsNullOrWhiteSpace)) throw new InvalidDataException($"{path}: a script is empty.");
+        if (MatchNames.Any(string.IsNullOrWhiteSpace)) throw new InvalidDataException($"{path}: a Match Name is empty.");
         if (HudLostAfterSeconds <= 0) throw new InvalidDataException($"{path}: \"hudLostAfterSeconds\" must be positive.");
         if (!Languages.Contains(GameLanguage)) throw new InvalidDataException($"{path}: \"gameLanguage\" must be de or en.");
         if (!Themes.Contains(Theme)) throw new InvalidDataException($"{path}: \"theme\" must be system, light or dark.");

@@ -488,6 +488,12 @@
           <div class="setting"><div class="text"><label for="hd">${esc(t('hud'))}</label><span class="desc">${esc(t('hud_d'))}</span></div><div class="row-flex" style="gap:8px"><input id="hd" class="input num" type="number" min="10" step="10" value="${d.matchEndWithoutHudSeconds}" data-change="draftNum" data-key="matchEndWithoutHudSeconds" style="width:90px"><span class="muted">${esc(t('seconds'))}</span></div></div>
           <div class="setting"><div class="text"><label for="dg">${esc(t('diag_mode'))}</label><span class="desc">${esc(t('diag_mode_d'))}</span></div><input id="dg" class="check" type="checkbox" ${d.diagnosticMode ? 'checked' : ''} data-change="draftBool" data-key="diagnosticMode"></div>
         </section>
+        <section class="card flush settings-group"><h2>${esc(t('sec_names'))}</h2>
+          <div class="stack" style="padding:14px 20px 20px;gap:10px">
+            <label class="small muted" for="mn">${esc(t('names_d'))}</label>
+            <textarea id="mn" class="input" rows="6" spellcheck="false" style="padding:8px 10px;resize:vertical" data-change="names">${esc((d.matchNames || []).join('\n'))}</textarea>
+          </div>
+        </section>
         <section class="card flush settings-group"><h2>${esc(t('sec_updates'))}</h2>
           <div class="setting"><div class="text"><span class="title">${esc(t('up_version'))}</span><span class="desc">${esc(updateLine())}</span></div>
             <div class="row-flex" style="gap:8px">
@@ -675,6 +681,7 @@
   const CHG = {
     draft: (v, el) => setDraft(el.dataset.key, v),
     draftBool: (v, el) => setDraft(el.dataset.key, el.checked),
+    names: (v) => setDraft('matchNames', v.split('\n').map((n) => n.trim()).filter((n, i, all) => n && all.indexOf(n) === i)),
     draftNum: (v, el) => setDraft(el.dataset.key, Math.max(Number(el.min) || 0, Number(v) || 0)),
     color: (v) => { setDraft('killMarkerColor', v.toUpperCase()); S.hexDraft = v.toUpperCase(); },
     hex: (v) => { S.hexDraft = v; if (/^#[0-9a-f]{6}$/i.test(v)) setDraft('killMarkerColor', v.toUpperCase()); },

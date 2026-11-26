@@ -7,7 +7,7 @@ public class ConfigTests
     [Fact]
     public void Saved_settings_are_loaded_back_after_a_restart()
     {
-        var saved = new Config([new Uri("http://localhost:8080/bf6")], Scripts: [@"C:\obs\mark.cmd"], GameLanguage: "en", UiLanguage: "de");
+        var saved = new Config([new Uri("http://localhost:8080/bf6")], Scripts: [@"C:\obs\mark.cmd"], GameLanguage: "en", UiLanguage: "de", MatchNames: ["TEAM DEATHMATCH"]);
 
         saved.Save(_path);
         var loaded = Config.Load(_path);
@@ -16,6 +16,7 @@ public class ConfigTests
         Assert.Equal([@"C:\obs\mark.cmd"], loaded.Scripts);
         Assert.Equal("en", loaded.GameLanguage);
         Assert.Equal("de", loaded.UiLanguage);
+        Assert.Equal(["TEAM DEATHMATCH"], loaded.MatchNames);
     }
 
     [Fact]

@@ -677,6 +677,7 @@ public sealed class UiHub : IEventSink
         ["toggleHotkey"] = config.ToggleHotkey,
         ["checkForUpdates"] = config.CheckForUpdates,
         ["autoInstallUpdates"] = config.AutoInstallUpdates,
+        ["matchNames"] = new JsonArray([.. config.MatchNames.Select(n => (JsonNode)n)]),
     };
 
     public static Config SettingsFrom(Config config, JsonObject s) => config with
@@ -694,6 +695,7 @@ public sealed class UiHub : IEventSink
         ToggleHotkey = ((string?)s["toggleHotkey"] ?? config.ToggleHotkey).Trim(),
         CheckForUpdates = (bool?)s["checkForUpdates"] ?? config.CheckForUpdates,
         AutoInstallUpdates = (bool?)s["autoInstallUpdates"] ?? config.AutoInstallUpdates,
+        MatchNames = s["matchNames"] is JsonArray names ? [.. names.Select(n => ((string?)n ?? "").Trim()).Where(n => n != "").Distinct()] : config.MatchNames,
     };
 
     /// <summary>The config with the window's list of Event Sinks. A malformed webhook URL makes the config invalid.</summary>

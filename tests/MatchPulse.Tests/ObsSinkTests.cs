@@ -35,6 +35,9 @@ public sealed class ObsSinkTests : IDisposable
         Assert.Equal("2026-11-23_91fdb6ce_Kill-3_20-00-00", ObsTemplate.Fill("{date}_{match}_Kill-{kills}_{time}", kill));
         Assert.Equal("mp 2 kills", ObsTemplate.Fill("{match} {kills} kills", mpKill));
         Assert.Equal("victory with 3 kills (#5)", ObsTemplate.Fill("{result} with {kills} kills (#{n})", ended));
+        var started = new GameEvent("match_started", "91fdb6ce4f2a", 1, Start, new Dictionary<string, string> { ["mode"] = "RAPID ROYALE – TRIOS", ["map"] = "MIRAK-TAL: FLUSSUFER" });
+        Assert.Equal("RAPID ROYALE – TRIOS / MIRAK-TAL: FLUSSUFER", ObsTemplate.Fill("{mode} / {map}", started));
+        Assert.Equal(" / ", ObsTemplate.Fill("{mode} / {map}", kill));
     }
 
     [Fact]

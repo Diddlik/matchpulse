@@ -69,7 +69,7 @@ sealed class TrayApp : ApplicationContext
             {
                 Status.SetGameRunning(running);
                 _hub.SetGameRunning(running);
-            }, _hub.KillPicture))
+            }, _hub.KillPicture, LearnMatchNames))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
         _hotkey = new Hotkey(() => SetActive(!Config.Active));
@@ -143,6 +143,20 @@ sealed class TrayApp : ApplicationContext
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
+    }
+
+    /// <summary>Adds Match Names read for the first time to the list the Player can correct in the settings.</summary>
+    void LearnMatchNames(IReadOnlyList<string> names)
+    {
+        try
+        {
+            Apply(Config with { MatchNames = [.. Config.MatchNames.Union(names)] });
+            _hub.SettingsChanged();
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            _log.LogError(e, "Could not save new Match Names");
+        }
     }
 
     /// <summary>Turns MatchPulse on or off (hotkey, tray menu); the window follows.</summary>

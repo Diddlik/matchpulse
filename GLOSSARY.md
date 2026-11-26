@@ -12,6 +12,10 @@ _Avoid_: signal, trigger, notification
 One game the player takes part in, from the moment the match start is recognised on screen until its end is recognised.
 _Avoid_: round, session, game
 
+**Match Name**:
+The mode and map of a Match, as the lobby shows them top left before it starts (for example "RAPID ROYALE – TRIOS" and "MIRAK-TAL: FLUSSUFER"). Read with OCR; the Player corrects misread names in a list.
+_Avoid_: title, lobby name
+
 **Player**:
 The person running MatchPulse. Game Events are only about what the Player does or experiences.
 _Avoid_: user, me, self

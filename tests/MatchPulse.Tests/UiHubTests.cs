@@ -105,6 +105,14 @@ public sealed class UiHubTests : IDisposable
     }
 
     [Fact]
+    public void Corrected_Match_Names_are_saved_trimmed_without_blanks_or_duplicates()
+    {
+        _hub.Receive("""{"type":"saveSettings","payload":{"matchNames":[" RAPID ROYALE – TRIOS ","","MIRAK-TAL: FLUSSUFER","RAPID ROYALE – TRIOS"]}}""");
+
+        Assert.Equal(["RAPID ROYALE – TRIOS", "MIRAK-TAL: FLUSSUFER"], _config.MatchNames);
+    }
+
+    [Fact]
     public void Saved_settings_map_to_the_config()
     {
         _hub.Receive("""{"type":"saveSettings","payload":{"gameLanguage":"en","uiLanguage":"de","theme":"dark","killMarkerColor":"#00FF00","checksPerSecond":7,"matchEndWithoutHudSeconds":90,"diagnosticMode":true,"notifyOnProblems":false,"liveMonitor":false}}""");
