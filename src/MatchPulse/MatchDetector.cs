@@ -7,10 +7,12 @@ namespace MatchPulse;
 /// <summary>
 /// Takes timestamped frames and emits Game Events. No I/O; time comes from the frames only.
 /// A Match starts when the in-match HUD is confirmed and ends on an end-of-match screen, or when the
-/// in-match HUD has been absent for <c>hudLostAfter</c>. Inside a Match it also reports the Player's knockdowns and
-/// death (spectating). Kills are reported everywhere; outside a Match
-/// (multiplayer) they carry no matchId and are found by the plain Kill Badge, which there also counts without a
-/// Kill Marker when it opens an empty Score Popup, and again when it is redrawn after a Kill Marker (multi-kill).
+/// in-match HUD has been absent for <c>hudLostAfter</c>. A REDSEC Match has the counter bar top right and ends on the
+/// REDSEC end screen; a multiplayer Match (a round) has the score bar top centre and ends on the round's SIEG or
+/// NIEDERLAGE banner. Inside a REDSEC Match it also reports the Player's knockdowns and death (spectating).
+/// Kills are reported everywhere; in multiplayer (inside a round or outside any Match, then without matchId) they
+/// are found by the plain Kill Badge, which there also counts without a Kill Marker when it opens an empty Score
+/// Popup, and again when it is redrawn after a Kill Marker (multi-kill).
 /// </summary>
 public sealed class MatchDetector
 {
@@ -27,12 +29,18 @@ public sealed class MatchDetector
     readonly (Scalar, Scalar)[]? _killMarkerBands; // null: Kill Marker colour not distinct, a Kill Badge alone is a kill
     static readonly (Scalar, Scalar)[] VictoryGold = [(new(20, 91, 151), new(36, 255, 255))];
     static readonly (Scalar, Scalar)[] DefeatRed = [(new(0, 91, 151), new(18, 255, 255)), (new(170, 91, 151), new(180, 255, 255))];
+    static readonly (Scalar, Scalar)[] TeamBlue = [(new(85, 80, 150), new(105, 255, 255))];
+    static readonly (Scalar, Scalar)[] TeamRed = [(new(0, 80, 150), new(15, 255, 255)), (new(170, 80, 150), new(180, 255, 255))];
+    Mat _mpEndShield = null!, _mpEndHexagon = null!;
 
     // Match state: no Match while _matchId is null.
     string? _matchId;
+    bool _multiplayerMatch;
+    bool Redsec => _matchId is not null && !_multiplayerMatch;
     int _sequence;
     DateTimeOffset _hudSeenAt;
     readonly Hysteresis _hud = new(Cue.InMatchHud.K);
+    readonly Hysteresis _mpHud = new(Cue.MpScoreBlue.K);
     readonly Hysteresis _victory = new(Cue.EndVictory.K);
     readonly Hysteresis _defeat = new(Cue.EndDefeat.K);
 
@@ -111,23 +119,28 @@ public sealed class MatchDetector
         if (frame.Image.Size() != _frameSize) LoadTemplates(frame.Image.Size());
         var events = new List<GameEvent>();
         var hud = GrayScore(frame.Image, Cue.InMatchHud, _inMatchHud) >= Cue.InMatchHud.Threshold;
+        var mpHud = ColourShare(frame.Image, Cue.MpScoreBlue, TeamBlue) >= Cue.MpScoreBlue.Threshold
+            && ColourShare(frame.Image, Cue.MpScoreRed, TeamRed) >= Cue.MpScoreRed.Threshold;
 
         if (_matchId is null)
         {
-            if (_hud.Update(hud, frame.Timestamp) is { } startedAt)
+            var redsecStart = _hud.Update(hud, frame.Timestamp);
+            var mpStart = _mpHud.Update(mpHud, frame.Timestamp);
+            if ((redsecStart ?? mpStart) is { } startedAt)
             {
-                _log.LogInformation("Cue {Cue} seen at {At:O}", Cue.InMatchHud.Name, startedAt);
-                StartMatch();
+                var multiplayer = redsecStart is null;
+                _log.LogInformation("Cue {Cue} seen at {At:O}", multiplayer ? "mp_score_bar" : Cue.InMatchHud.Name, startedAt);
+                StartMatch(multiplayer);
                 _hudSeenAt = frame.Timestamp;
                 events.Add(Emit("match_started", startedAt));
                 return events;
             }
         }
-        else if (EndOfMatch(frame, hud) is { } ended)
+        else if (EndOfMatch(frame, _multiplayerMatch ? mpHud : hud) is { } ended)
             return ended;
 
         Kills(frame, events);
-        if (_matchId is not null)
+        if (Redsec)
         {
             Knockdowns(frame, events);
             Death(frame, events);
@@ -173,17 +186,20 @@ public sealed class MatchDetector
     List<GameEvent>? EndOfMatch(Frame frame, bool hud)
     {
         if (hud) _hudSeenAt = frame.Timestamp;
-        var victory = _victory.Update(MaskScore(frame.Image, Cue.EndVictory, VictoryGold, _endVictory) >= Cue.EndVictory.Threshold, frame.Timestamp);
-        var defeat = _defeat.Update(MaskScore(frame.Image, Cue.EndDefeat, DefeatRed, _endDefeat) >= Cue.EndDefeat.Threshold, frame.Timestamp);
+        var victory = _victory.Update(_multiplayerMatch
+            ? MaskScore(frame.Image, Cue.MpEndShield, TeamBlue, _mpEndShield, _mpEndHexagon) >= Cue.MpEndShield.Threshold
+            : MaskScore(frame.Image, Cue.EndVictory, VictoryGold, _endVictory) >= Cue.EndVictory.Threshold, frame.Timestamp);
+        var defeat = _defeat.Update(_multiplayerMatch
+            ? MaskScore(frame.Image, Cue.MpEndShield, TeamRed, _mpEndShield, _mpEndHexagon) >= Cue.MpEndShield.Threshold
+            : MaskScore(frame.Image, Cue.EndDefeat, DefeatRed, _endDefeat) >= Cue.EndDefeat.Threshold, frame.Timestamp);
         if ((victory ?? defeat) is { } endedAt)
         {
-            var end = victory is null ? Cue.EndDefeat : Cue.EndVictory;
-            _log.LogInformation("Cue {Cue} seen at {At:O}", end.Name, endedAt);
+            _log.LogInformation("Cue {Cue} seen at {At:O}", _multiplayerMatch ? (victory is null ? "mp_end_red_emblem" : "mp_end_blue_emblem") : (victory is null ? Cue.EndDefeat : Cue.EndVictory).Name, endedAt);
             return EndMatch(endedAt, victory is null ? "defeat" : "victory", "end_screen");
         }
         if (frame.Timestamp - _hudSeenAt > _hudLostAfter)
         {
-            _log.LogInformation("Cue {Cue} absent since {At:O}", Cue.InMatchHud.Name, _hudSeenAt);
+            _log.LogInformation("Cue {Cue} absent since {At:O}", _multiplayerMatch ? "mp_score_bar" : Cue.InMatchHud.Name, _hudSeenAt);
             return EndMatch(frame.Timestamp, "unknown", "hud_lost");
         }
         return null;
@@ -199,7 +215,7 @@ public sealed class MatchDetector
         }
         _killMarkerVisible = killMarker;
 
-        var multiplayer = _matchId is null;
+        var multiplayer = !Redsec;
         var badge = multiplayer ? Cue.KillBadgePlain : Cue.KillBadge;
         var badges = CountBadges(frame.Image, badge, multiplayer ? _killBadgePlain : _killBadge);
         if (badges == 0) _noKillBadgeSince ??= frame.Timestamp;
@@ -268,9 +284,10 @@ public sealed class MatchDetector
     public IReadOnlyList<GameEvent> Stopped(DateTimeOffset at) =>
         _matchId is null ? [] : EndMatch(at, "unknown", "stopped");
 
-    void StartMatch()
+    void StartMatch(bool multiplayer)
     {
         _matchId = Guid.NewGuid().ToString("N");
+        _multiplayerMatch = multiplayer;
         _victory.Reset();
         _defeat.Reset();
         ResetKills();
@@ -308,6 +325,7 @@ public sealed class MatchDetector
         events.Add(Emit("match_ended", at, new() { ["result"] = result, ["reason"] = reason, ["kills"] = Count(_kills) }));
         _matchId = null;
         _hud.Reset();
+        _mpHud.Reset();
         ResetKills();
         return events;
     }
@@ -364,6 +382,8 @@ public sealed class MatchDetector
         _inMatchHud = Cue.InMatchHud.LoadTemplate(frame, _gameLanguage);
         _endVictory = Cue.EndVictory.LoadTemplate(frame, _gameLanguage);
         _endDefeat = Cue.EndDefeat.LoadTemplate(frame, _gameLanguage);
+        _mpEndShield = Cue.MpEndShield.LoadTemplate(frame, _gameLanguage);
+        _mpEndHexagon = Cue.MpEndHexagon.LoadTemplate(frame, _gameLanguage);
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>
@@ -414,6 +434,20 @@ public sealed class MatchDetector
             scores.MinMaxLoc(out _, out double max);
             return max;
         });
+    }
+
+    // The share of a Cue region's pixels that fall in one of the HSV bands.
+    static double ColourShare(Mat image, Cue cue, (Scalar Low, Scalar High)[] bands)
+    {
+        using var region = cue.Crop(image);
+        using var hsv = region.CvtColor(ColorConversionCodes.BGR2HSV);
+        var inside = 0;
+        foreach (var (low, high) in bands)
+        {
+            using var band = hsv.InRange(low, high);
+            inside += band.CountNonZero();
+        }
+        return (double)inside / (hsv.Rows * hsv.Cols);
     }
 
     bool KillCounterFlashes(Mat image)

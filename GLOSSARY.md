@@ -9,7 +9,7 @@ A fact about the game that MatchPulse announces, such as a match starting or a k
 _Avoid_: signal, trigger, notification
 
 **Match**:
-One game the player takes part in, from the moment the match start is recognised on screen until its end is recognised.
+One game the player takes part in, from the moment the match start is recognised on screen until its end is recognised. In REDSEC that is the whole battle royale; in regular multiplayer it is one round, from the score bar appearing to the SIEG or NIEDERLAGE banner.
 _Avoid_: round, session, game
 
 **Match Name**:

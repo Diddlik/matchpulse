@@ -1,0 +1,27 @@
+{
+  "clip": "mp_defeat_conquest-1125.mkv",
+  "source": {
+    "recording": "2026-11-25 21-24-53.mkv",
+    "start": 500.0,
+    "duration": 14.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 9.0,
+      "data": {
+        "result": "defeat",
+        "reason": "end_screen",
+        "kills": "0"
+      }
+    }
+  ],
+  "notes": "Conquest round lost: score bar until 7.0 s, banner NIEDERLAGE with the shield emblem in red from 9.0 s to 11.0 s (Conquest shows the same shield for both results)."
+}

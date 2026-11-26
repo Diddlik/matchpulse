@@ -1,0 +1,18 @@
+{
+  "clip": "mp_round-start_conquest-1125.mkv",
+  "source": {
+    "recording": "2026-11-25 23-04-39.mkv",
+    "start": 280.0,
+    "duration": 10.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 5.0,
+      "data": {}
+    }
+  ],
+  "notes": "Conquest round start after the briefing: the score bar top centre (blue 0xx box left, red box right) appears at 5.0 s. Multiplayer Match."
+}

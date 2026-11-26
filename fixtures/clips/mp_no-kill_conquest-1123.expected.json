@@ -7,6 +7,12 @@
   },
   "encoding": "re-encoded: libx264 CRF 26, 15 fps, 2560x1440, yuv420p, no audio",
   "gameLanguage": "de",
-  "events": [],
-  "notes": "Multiplayer play without a kill: no Game Event."
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    }
+  ],
+  "notes": "Multiplayer play without a kill: no Game Event. The score bar is on screen from the start, so a multiplayer Match starts at 0.0 s (since ticket 10)."
 }

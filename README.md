@@ -23,7 +23,7 @@ MatchPulse runs quietly in the tray while you play. It watches the game on scree
 
 - **Kills** in every mode, also under a Jammer, without counting kills your Squad finishes
 - **Knockdowns** and **your death** in REDSEC
-- **Matches** in REDSEC: start, victory, defeat
+- **Matches** in REDSEC and multiplayer rounds (Conquest, Team Deathmatch): start, victory, defeat
 - **OBS plugin**: start and stop recording, save the replay buffer, chapter markers, scenes, texts, overlays, streaming
 - **Highlight video** of every match, cut from the saved replays, and a **stream overlay** (match timer, kill counter, kill animation) as an OBS browser source
 - **MQTT** and **Home Assistant** (auto-discovered device with sensors and triggers), Node-RED and other automation tools
@@ -62,7 +62,7 @@ The hit marker X appears on every hit that downs or kills, and the game shows th
    The installer is not signed yet, so Windows SmartScreen may say *unknown publisher*: choose **More info → Run anyway**.
 2. MatchPulse starts in the tray. Double-click the icon to open it.
 3. In **Settings**, set the **kill marker colour** to the colour of the hit X in your game settings (red by default) and the **game language** (German or English).
-4. Start Battlefield 6. The tray icon turns orange when the game runs and green during a REDSEC match.
+4. Start Battlefield 6. The tray icon turns orange when the game runs and green during a match.
 
 Requirements: Windows 10 (1809) or 11, x64, with the Edge WebView2 Runtime (included in Windows 11). Everything else is bundled. A portable zip is attached to every release too.
 
@@ -82,7 +82,7 @@ Every event is a JSON object, the same for every target:
 
 | `type` | When | `data` |
 |---|---|---|
-| `match_started` | a REDSEC match begins | `mode`, `map`: the Match Name read in the lobby (missing when none was read) |
+| `match_started` | a REDSEC match or a multiplayer round begins | `mode`, `map`: the Match Name read in the lobby (missing when none was read) |
 | `kill` | you kill an opponent; in REDSEC already when you knock him down (finishing him later adds no second kill) | `kills`: your kills in this match so far |
 | `knockdown` | you knock an opponent down (REDSEC), together with its `kill` | – |
 | `death` | you are eliminated and spectate (REDSEC, German game language so far) | – |
@@ -164,7 +164,7 @@ Turn on **Plugins → Stream overlay** and add `http://localhost:4466/` in OBS a
 
 ## Limits
 
-- REDSEC: matches, kills, knockdowns, deaths. Regular multiplayer: kills only so far (round start and end, knockdowns, deaths and double kills follow).
+- REDSEC: matches, kills, knockdowns, deaths. Regular multiplayer: rounds (start, victory, defeat) and kills; knockdowns and deaths follow.
 - 16:9 screens; ultrawide (21:9) is planned.
 - Death detection needs the German game language until an English *Spectating* image is added.
 - A hit marker that shows for a single frame can be missed at 10 checks per second.

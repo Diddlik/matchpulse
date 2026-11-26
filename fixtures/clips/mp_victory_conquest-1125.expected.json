@@ -1,0 +1,27 @@
+{
+  "clip": "mp_victory_conquest-1125.mkv",
+  "source": {
+    "recording": "2026-11-25 23-04-39.mkv",
+    "start": 1420.0,
+    "duration": 12.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 6.8,
+      "data": {
+        "result": "victory",
+        "reason": "end_screen",
+        "kills": "0"
+      }
+    }
+  ],
+  "notes": "Conquest round won: score bar until 4.8 s, deploy screen, banner SIEG with the blue shield emblem from 6.8 s to 8.8 s."
+}

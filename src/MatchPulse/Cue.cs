@@ -40,6 +40,21 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     /// <summary>Red shield emblem of the defeat screen, matched as a red mask. It shows for only about 2 s.</summary>
     public static readonly Cue EndDefeat = new("end_defeat", "end_defeat_mask.png", new Rect2d(0.4375, 0.1528, 0.1250, 0.2778), 0.8, 3);
 
+    /// <summary>Multiplayer: the Player's team score box at the left of the score bar (top centre). Its score changes, so it is
+    /// matched as the share of team-blue pixels (<see cref="Threshold"/>), not by a template; with <see cref="MpScoreRed"/> it is the multiplayer in-match HUD.</summary>
+    public static readonly Cue MpScoreBlue = new("mp_score_blue", "", new Rect2d(0.3566, 0.0507, 0.0430, 0.0278), 0.06, 5);
+
+    /// <summary>Multiplayer: the enemy team score box at the right of the score bar, matched as the share of team-red pixels.</summary>
+    public static readonly Cue MpScoreRed = new("mp_score_red", "", new Rect2d(0.6000, 0.0507, 0.0438, 0.0278), 0.06, 5);
+
+    /// <summary>Multiplayer: emblem of the banner at the end of a round, 2-3 s long. Its shape depends on the mode (Conquest: shield,
+    /// Team Deathmatch: hexagon with a skull), its colour on the result (blue "SIEG", red "NIEDERLAGE"), so both shapes are
+    /// matched as a blue and as a red mask. Banners score 0.95-0.97; other frames at most 0.59 (REDSEC) and 0.55 (rounds).</summary>
+    public static readonly Cue MpEndShield = new("mp_end_shield", "mp_end_shield_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
+
+    /// <inheritdoc cref="MpEndShield"/>
+    public static readonly Cue MpEndHexagon = new("mp_end_hexagon", "mp_end_hexagon_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
+
     public const int ReferenceHeight = 1440;
 
     /// <summary>The template for <paramref name="language"/>, scaled from 2560x1440 to a 16:9 frame of the given size.</summary>

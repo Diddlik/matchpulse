@@ -14,7 +14,7 @@ public static class GameWatcher
     static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
 
     // Match Name: the lobby header is read this often while no Match runs; reads older than NameFreshFor at match_started
-    // belong to an earlier lobby (the REDSEC lobby and helicopter intro take a few minutes).
+    // belong to an earlier lobby (the REDSEC lobby and helicopter intro, or a multiplayer briefing, take a few minutes).
     static readonly TimeSpan NameReadEvery = TimeSpan.FromSeconds(2), NameFreshFor = TimeSpan.FromMinutes(5);
 
     /// <summary>Runs until <paramref name="stop"/> is cancelled. <paramref name="gameRunning"/> is told when <c>bf6.exe</c> starts and exits.

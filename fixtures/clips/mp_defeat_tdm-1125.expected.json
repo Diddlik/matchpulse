@@ -1,0 +1,27 @@
+{
+  "clip": "mp_defeat_tdm-1125.mkv",
+  "source": {
+    "recording": "2026-11-25 20-27-52.mkv",
+    "start": 655.0,
+    "duration": 13.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 8.2,
+      "data": {
+        "result": "defeat",
+        "reason": "end_screen",
+        "kills": "0"
+      }
+    }
+  ],
+  "notes": "Team Deathmatch round lost 076 : 100: score bar until 7.0 s, banner NIEDERLAGE with the red hexagon (skull) emblem from 8.2 s to 10.6 s; it fades in, full from 8.6 s."
+}

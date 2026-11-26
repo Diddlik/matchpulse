@@ -9,6 +9,11 @@
   "gameLanguage": "de",
   "events": [
     {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
       "type": "kill",
       "offset": 2.0,
       "data": {
@@ -16,5 +21,5 @@
       }
     }
   ],
-  "notes": "Multiplayer kill: Kill Marker at 2.0 s, plain skull with 100 from 2.4 s."
+  "notes": "Multiplayer kill: Kill Marker at 2.0 s, plain skull with 100 from 2.4 s. The score bar is on screen from the start, so a multiplayer Match starts at 0.0 s (since ticket 10)."
 }
