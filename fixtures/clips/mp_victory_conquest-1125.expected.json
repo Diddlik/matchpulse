@@ -10,7 +10,7 @@
   "events": [
     {
       "type": "match_started",
-      "offset": 0.0,
+      "offset": 2.4,
       "data": {}
     },
     {
@@ -23,5 +23,5 @@
       }
     }
   ],
-  "notes": "Conquest round won: score bar until 4.8 s, deploy screen, banner SIEG with the blue shield emblem from 6.8 s to 8.8 s."
+  "notes": "Conquest round won: score bar until 4.8 s, its team boxes blinking at first (the round is nearly won), so the Match is confirmed from 2.4 s; deploy screen, then banner SIEG with the blue shield emblem from 6.8 s to 8.8 s."
 }

@@ -41,19 +41,23 @@ public sealed record Cue(string Name, string Template, Rect2d SearchRegion, doub
     public static readonly Cue EndDefeat = new("end_defeat", "end_defeat_mask.png", new Rect2d(0.4375, 0.1528, 0.1250, 0.2778), 0.8, 3);
 
     /// <summary>Multiplayer: the Player's team score box at the left of the score bar (top centre). Its score changes, so it is
-    /// matched as the share of team-blue pixels (<see cref="Threshold"/>), not by a template; with <see cref="MpScoreRed"/> it is the multiplayer in-match HUD.</summary>
-    public static readonly Cue MpScoreBlue = new("mp_score_blue", "", new Rect2d(0.3566, 0.0507, 0.0430, 0.0278), 0.06, 5);
+    /// matched as the share of team-blue pixels (<see cref="Threshold"/>), not by a template; with <see cref="MpScoreRed"/> it is the multiplayer in-match HUD.
+    /// A one-digit score (Escalation) fills only 3-7 % of the box; REDSEC reaches 3 % in both boxes for at most 2 checks at 5/s, hence K = 10.</summary>
+    public static readonly Cue MpScoreBlue = new("mp_score_blue", "", new Rect2d(0.3566, 0.0507, 0.0430, 0.0278), 0.03, 10);
 
     /// <summary>Multiplayer: the enemy team score box at the right of the score bar, matched as the share of team-red pixels.</summary>
-    public static readonly Cue MpScoreRed = new("mp_score_red", "", new Rect2d(0.6000, 0.0507, 0.0438, 0.0278), 0.06, 5);
+    public static readonly Cue MpScoreRed = new("mp_score_red", "", new Rect2d(0.6000, 0.0507, 0.0438, 0.0278), 0.03, 10);
 
     /// <summary>Multiplayer: emblem of the banner at the end of a round, 2-3 s long. Its shape depends on the mode (Conquest: shield,
-    /// Team Deathmatch: hexagon with a skull), its colour on the result (blue "SIEG", red "NIEDERLAGE"), so both shapes are
-    /// matched as a blue and as a red mask. Banners score 0.95-0.97; other frames at most 0.59 (REDSEC) and 0.55 (rounds).</summary>
+    /// Team Deathmatch: hexagon with a skull, Escalation: shield with a flag), its colour on the result (blue "SIEG", red "NIEDERLAGE"), so both shapes are
+    /// matched as a blue and as a red mask. Banners score 0.95-0.97; other frames at most 0.62 (all samples, REDSEC and rounds).</summary>
     public static readonly Cue MpEndShield = new("mp_end_shield", "mp_end_shield_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
 
     /// <inheritdoc cref="MpEndShield"/>
     public static readonly Cue MpEndHexagon = new("mp_end_hexagon", "mp_end_hexagon_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
+
+    /// <inheritdoc cref="MpEndShield"/>
+    public static readonly Cue MpEndFlag = new("mp_end_flag", "mp_end_flag_mask.png", new Rect2d(0.4219, 0.1389, 0.1563, 0.2778), 0.8, 3);
 
     public const int ReferenceHeight = 1440;
 

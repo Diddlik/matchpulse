@@ -31,7 +31,7 @@ public sealed class MatchDetector
     static readonly (Scalar, Scalar)[] DefeatRed = [(new(0, 91, 151), new(18, 255, 255)), (new(170, 91, 151), new(180, 255, 255))];
     static readonly (Scalar, Scalar)[] TeamBlue = [(new(85, 80, 150), new(105, 255, 255))];
     static readonly (Scalar, Scalar)[] TeamRed = [(new(0, 80, 150), new(15, 255, 255)), (new(170, 80, 150), new(180, 255, 255))];
-    Mat _mpEndShield = null!, _mpEndHexagon = null!;
+    Mat[] _mpEndEmblems = [];
 
     // Match state: no Match while _matchId is null.
     string? _matchId;
@@ -187,10 +187,10 @@ public sealed class MatchDetector
     {
         if (hud) _hudSeenAt = frame.Timestamp;
         var victory = _victory.Update(_multiplayerMatch
-            ? MaskScore(frame.Image, Cue.MpEndShield, TeamBlue, _mpEndShield, _mpEndHexagon) >= Cue.MpEndShield.Threshold
+            ? MaskScore(frame.Image, Cue.MpEndShield, TeamBlue, _mpEndEmblems) >= Cue.MpEndShield.Threshold
             : MaskScore(frame.Image, Cue.EndVictory, VictoryGold, _endVictory) >= Cue.EndVictory.Threshold, frame.Timestamp);
         var defeat = _defeat.Update(_multiplayerMatch
-            ? MaskScore(frame.Image, Cue.MpEndShield, TeamRed, _mpEndShield, _mpEndHexagon) >= Cue.MpEndShield.Threshold
+            ? MaskScore(frame.Image, Cue.MpEndShield, TeamRed, _mpEndEmblems) >= Cue.MpEndShield.Threshold
             : MaskScore(frame.Image, Cue.EndDefeat, DefeatRed, _endDefeat) >= Cue.EndDefeat.Threshold, frame.Timestamp);
         if ((victory ?? defeat) is { } endedAt)
         {
@@ -290,7 +290,10 @@ public sealed class MatchDetector
         _multiplayerMatch = multiplayer;
         _victory.Reset();
         _defeat.Reset();
-        ResetKills();
+        // A multiplayer round keeps the Kill Badge rules used before it, so what the Score Popup and the Kill Marker
+        // showed while its start was being confirmed still counts; only the counts start again.
+        if (multiplayer) (_sequence, _kills) = (0, 0);
+        else ResetKills();
     }
 
     // Per Match, and back to multiplayer kills (other Kill Badge template) after it.
@@ -382,8 +385,8 @@ public sealed class MatchDetector
         _inMatchHud = Cue.InMatchHud.LoadTemplate(frame, _gameLanguage);
         _endVictory = Cue.EndVictory.LoadTemplate(frame, _gameLanguage);
         _endDefeat = Cue.EndDefeat.LoadTemplate(frame, _gameLanguage);
-        _mpEndShield = Cue.MpEndShield.LoadTemplate(frame, _gameLanguage);
-        _mpEndHexagon = Cue.MpEndHexagon.LoadTemplate(frame, _gameLanguage);
+        foreach (var emblem in _mpEndEmblems) emblem.Dispose();
+        _mpEndEmblems = [.. new[] { Cue.MpEndShield, Cue.MpEndHexagon, Cue.MpEndFlag }.Select(c => c.LoadTemplate(frame, _gameLanguage))];
     }
 
     GameEvent Emit(string type, DateTimeOffset at, Dictionary<string, string>? data = null) =>

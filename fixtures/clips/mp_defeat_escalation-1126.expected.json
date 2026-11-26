@@ -1,0 +1,27 @@
+{
+  "clip": "mp_defeat_escalation-1126.mkv",
+  "source": {
+    "recording": "2026-11-26 11-46-51.mkv",
+    "start": 2049.0,
+    "duration": 25.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 0.0,
+      "data": {}
+    },
+    {
+      "type": "match_ended",
+      "offset": 20.6,
+      "data": {
+        "result": "defeat",
+        "reason": "end_screen",
+        "kills": "0"
+      }
+    }
+  ],
+  "notes": "Escalation round lost: score bar until 3.0 s, deploy map, banner NIEDERLAGE with the red shield-with-flag emblem from 20.6 s to 22.6 s."
+}

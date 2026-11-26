@@ -1,0 +1,18 @@
+{
+  "clip": "mp_round-start_escalation-1126.mkv",
+  "source": {
+    "recording": "2026-11-26 11-46-51.mkv",
+    "start": 222.0,
+    "duration": 12.0
+  },
+  "encoding": "re-encoded: libx264 CRF 26, 30 fps, 2560x1440, yuv420p, no audio",
+  "gameLanguage": "de",
+  "events": [
+    {
+      "type": "match_started",
+      "offset": 6.6,
+      "data": {}
+    }
+  ],
+  "notes": "Escalation (Iberische Offensive: King's Battery) round start after the deploy: the score bar appears at 6.6 s. Escalation scores are one digit (0 : 0), so the team boxes are only 3-7 % coloured."
+}
