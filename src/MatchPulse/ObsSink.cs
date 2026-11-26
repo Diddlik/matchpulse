@@ -31,7 +31,7 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
             Later(TimeSpan.FromSeconds(rule.DelaySeconds), session => RunAsync(session, rule, gameEvent), rule.Action == "save_replay");
         if (gameEvent.Type == "match_started") lock (_lock) _replays.Clear();
         try { await RunNowAsync(rules.Where(r => r.DelaySeconds <= 0).ToList(), gameEvent, cancellationToken); }
-        finally { if (gameEvent.Type == "match_ended") Reel(gameEvent.OccurredAt); }
+        finally { if (gameEvent is { Type: "match_ended", MatchId: { } matchId }) Reel(gameEvent.OccurredAt, matchId); }
     }
 
     async Task RunNowAsync(List<ObsRule> now, GameEvent gameEvent, CancellationToken cancellationToken)
@@ -131,7 +131,7 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
     });
 
     // The Match ended: builds its highlight video in the background.
-    void Reel(DateTimeOffset endedAt)
+    void Reel(DateTimeOffset endedAt, string matchId)
     {
         List<HighlightReel.Replay> replays;
         lock (_lock) { replays = [.. _replays]; _replays.Clear(); }
@@ -140,7 +140,7 @@ public sealed class ObsSink(ObsSettings settings, Action<IEventSink, Exception?>
         {
             try
             {
-                reelSaved?.Invoke(await HighlightReel.BuildAsync(replays, settings.ClipSeconds, endedAt));
+                reelSaved?.Invoke(await HighlightReel.BuildAsync(replays, settings.ClipSeconds, endedAt, matchId));
                 later?.Invoke(this, null);
             }
             catch (Exception e)

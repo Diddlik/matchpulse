@@ -35,14 +35,15 @@ public static class HighlightReel
     static (string, double) Cut(Replay last, DateTimeOffset runStart, double clipSeconds) =>
         (last.Path, (last.SavedAt - runStart).TotalSeconds + clipSeconds);
 
-    /// <summary>Writes the highlight video next to the first replay and returns its path.</summary>
-    public static async Task<string> BuildAsync(IReadOnlyList<Replay> replays, double clipSeconds, DateTimeOffset matchEnded)
+    /// <summary>Writes the highlight video next to the first replay and returns its path; its name ends with the first
+    /// 8 characters of the <paramref name="matchId"/>, like <c>{match}</c> in OBS rules.</summary>
+    public static async Task<string> BuildAsync(IReadOnlyList<Replay> replays, double clipSeconds, DateTimeOffset matchEnded, string matchId)
     {
         var existing = replays.Where(r => File.Exists(r.Path)).ToList();
         if (existing.Count == 0) throw new ObsException("Highlight video: the saved replays are not on this PC.");
         var ext = System.IO.Path.GetExtension(existing[0].Path);
         var output = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(existing[0].Path)!,
-            $"Highlights {matchEnded.ToLocalTime().ToString("yyyy-MM-dd HH-mm", CultureInfo.InvariantCulture)}{ext}");
+            $"Highlights {matchEnded.ToLocalTime().ToString("yyyy-MM-dd HH-mm", CultureInfo.InvariantCulture)} {matchId[..Math.Min(8, matchId.Length)]}{ext}");
         var temp = Directory.CreateTempSubdirectory("MatchPulse-reel-").FullName;
         try
         {
