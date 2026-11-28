@@ -60,6 +60,7 @@ public static class GameWatcher
             var inMatch = false;
             var paused = false;
             var blind = 0;
+            CompositionNudge? nudge = null; // from the first missing picture until the game exits
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 // Paused (Config.Active off): no capture and no Game Events; a running Match ends with reason "stopped".
@@ -122,10 +123,13 @@ public static class GameWatcher
                 }
                 catch (TimeoutException e)
                 {
-                    // First try quietly: have Windows redraw the game window's frame (the window only, never the game process).
+                    // First try quietly: put the Composition Nudge over the game (anew each time, it may have lost the top)
+                    // and have Windows redraw the game window's frame (the window only, never the game process).
                     // Then warn once per game run; the capture keeps restarting quietly.
+                    nudge?.Dispose();
+                    nudge = new CompositionNudge(System.Windows.Forms.Screen.FromHandle(window).Bounds);
                     if (++blind == 1)
-                        log.LogInformation("No picture from monitor {Monitor} while bf6.exe is in front ({Reason}): redrawing the game window and restarting capture", monitor, e.Message);
+                        log.LogInformation("No picture from monitor {Monitor} while bf6.exe is in front ({Reason}): keeping the game composed, redrawing its window and restarting capture", monitor, e.Message);
                     else if (blind == 2)
                         log.LogWarning("No picture from monitor {Monitor} for {Seconds} s while bf6.exe is in front ({Reason}); capture restarts. Exclusive fullscreen hides the game from screen capture: use borderless. Otherwise restart bf6.exe",
                             monitor, LiveFrameSource.NoPictureAfter.TotalSeconds, e.Message);
@@ -138,6 +142,7 @@ public static class GameWatcher
                     stop.WaitHandle.WaitOne(Poll);
                 }
             }
+            nudge?.Dispose();
             if (stop.IsCancellationRequested)
             {
                 foreach (var gameEvent in detector.Stopped(DateTimeOffset.Now)) dispatch(gameEvent);
