@@ -36,6 +36,9 @@ static class Program
                 using var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\MatchPulse.Show");
                 if (!first)
                 {
+                    // This start was clicked, so it may bring a window to the front; without passing that on, the
+                    // running one's window opens behind the others.
+                    AllowSetForegroundWindow(AnyProcess);
                     show.Set();
                     return 0;
                 }
@@ -113,4 +116,9 @@ static class Program
 
     [DllImport("kernel32.dll")]
     static extern bool AttachConsole(int processId);
+
+    const int AnyProcess = -1;
+
+    [DllImport("user32.dll")]
+    static extern bool AllowSetForegroundWindow(int processId);
 }

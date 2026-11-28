@@ -69,8 +69,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\MatchPulse.exe"; Parameters: "--show"; Description: "{cm:Launch}"; Flags: nowait postinstall skipifsilent
-; Auto-update (MatchPulse runs the installer with /VERYSILENT /relaunch=1): start again in the tray.
-Filename: "{app}\MatchPulse.exe"; Flags: nowait; Check: Relaunch
+; Auto-update (MatchPulse runs the installer with /VERYSILENT /relaunch=1): start again in the tray, as the user and
+; not elevated like the installer: MatchPulse needs no admin rights.
+Filename: "{app}\MatchPulse.exe"; Flags: nowait runasoriginaluser; Check: Relaunch
 
 [UninstallRun]
 ; Stop only the MatchPulse that runs from this installation, never another copy (e.g. a developer build).
