@@ -53,6 +53,7 @@
     }, 500),
     setLiveMonitor: ({ enabled }) => { db.settings.liveMonitor = enabled; log('INFO', enabled ? 'Live monitor on: kill images are captured' : 'Live monitor off'); },
     openLiveWindow: () => log('INFO', 'Live monitor window requested'),
+    askLivePreview: () => {},
     openDiagnosticsFolder: () => log('INFO', 'Open diagnostics folder requested'),
     clearDiagnostics: () => { db.diagnostics = []; emitCopy({ type: 'diagnostics', payload: [] }); log('INFO', 'Diagnostics folder cleared'); },
     openMainWindow: () => {}

@@ -50,9 +50,13 @@ public sealed class UiHub : IEventSink
         _dataFolder = dataFolder;
         _diagnosticsFolder = Path.Combine(dataFolder, "diagnostics");
         _killsFolder = Path.Combine(dataFolder, "kills");
+        Preview.Picture += (url, at) => Send("livePreview", new JsonObject { ["imageUrl"] = url, ["capturedAt"] = at });
     }
 
     public string DataFolder => _dataFolder;
+
+    /// <summary>The live monitor's live picture, sent as <c>livePreview</c> while the window asks for it.</summary>
+    public LivePreview Preview { get; } = new();
 
     /// <summary>Auto-update; set once by the tray app (null in tests and the terminal modes).</summary>
     public UpdateService? Updates
@@ -230,6 +234,7 @@ public sealed class UiHub : IEventSink
             case "setActive": Apply(_config() with { Active = (bool?)payload!["active"] ?? true }); break;
             case "setLiveMonitor": Apply(_config() with { LiveMonitor = (bool?)payload!["enabled"] ?? false }); break;
             case "openLiveWindow": WindowRequested?.Invoke("live"); break;
+            case "askLivePreview": Preview.Ask(); break;
             case "checkUpdates" when _updates is not null: _ = _updates.CheckAsync(); break;
             case "installUpdate" when _updates is not null: _ = _updates.InstallAsync(); break;
             case "openReleasePage" when (string?)_updates?.State()["releaseUrl"] is { } url:

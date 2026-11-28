@@ -20,13 +20,13 @@ public static class LiveFrameSource
         .Select(f => f.GetValue(null)).OfType<Cue>().ToArray();
 
     /// <param name="extraRegions">Screen areas (relative) captured in addition to the Cue regions, for diagnostic mode.</param>
-    /// <summary>How long the game may be in front without a new, not all-black picture before <see cref="TimeoutException"/>.</summary>
+    /// <summary>How long the game may be in front without a new, changed, not all-black picture before <see cref="TimeoutException"/>.</summary>
     public static readonly TimeSpan NoPictureAfter = TimeSpan.FromSeconds(10);
 
     /// <param name="fullFrame">Asked before each check: true captures the whole screen once (a kill picture).</param>
-    /// <param name="gameInFront">Asked each check. While true, Windows must deliver a new picture that is not all black within
-    /// <see cref="NoPictureAfter"/>, or <see cref="TimeoutException"/> is thrown (the game renders all the time, so the capture is blind,
-    /// e.g. in exclusive fullscreen). While false, a still desktop is normal.</param>
+    /// <param name="gameInFront">Asked each check. While true, Windows must deliver a new picture that is not all black and differs from
+    /// the last within <see cref="NoPictureAfter"/>, or <see cref="TimeoutException"/> is thrown (the game renders all the time, so the
+    /// capture is blind, e.g. in exclusive fullscreen, or sees only the desktop behind the game). While false, a still desktop is normal.</param>
     public static IEnumerable<Frame> Read(IntPtr monitor, double checksPerSecond, CancellationToken stop, IReadOnlyList<Rect2d>? extraRegions = null, Func<bool>? fullFrame = null,
         Func<bool>? gameInFront = null)
     {
@@ -47,7 +47,7 @@ public static class LiveFrameSource
                 else if (DateTimeOffset.Now - lastPicture > NoPictureAfter)
                 {
                     image.Dispose();
-                    throw new TimeoutException(capture.Pictures == 0 ? "Windows delivers no picture" : "Windows delivers no new or only black pictures");
+                    throw new TimeoutException(capture.Pictures == 0 ? "Windows delivers no picture" : "Windows delivers no new, only unchanged or only black pictures");
                 }
                 yield return new Frame(DateTimeOffset.Now, image) { Full = full };
                 var wait = next - DateTimeOffset.Now;
@@ -64,6 +64,7 @@ public static class LiveFrameSource
         readonly ID3D11Texture2D _staging;
         readonly int _width, _height;
         readonly Rect[] _regions;
+        double _lastSum;
 
         Capture(ID3D11Device device, ID3D11DeviceContext context, IDXGIOutputDuplication duplication, IReadOnlyList<Rect2d> extraRegions)
         {
@@ -104,11 +105,11 @@ public static class LiveFrameSource
 
         /// <summary>The current screen with only the Cue regions filled, or null when access was lost.
         /// With <paramref name="wantFull"/>, the whole screen when a new desktop image arrived (<paramref name="full"/>).
-        /// <paramref name="picture"/>: a new desktop image arrived and it is not all black.</summary>
+        /// <paramref name="picture"/>: a new desktop image arrived, it is not all black and it differs from the last one.</summary>
         public Mat? Next(bool wantFull, out bool full, out bool picture)
         {
             full = picture = false;
-            var result = _duplication.AcquireNextFrame(100, out _, out var resource);
+            var result = _duplication.AcquireNextFrame(100, out var info, out var resource);
             if (result == Vortice.DXGI.ResultCode.AccessLost) return null;
             if (result.Success)
             {
@@ -125,8 +126,12 @@ public static class LiveFrameSource
                                 new Box(r.X, r.Y, 0, r.Right, r.Bottom, 1));
                 }
                 _duplication.ReleaseFrame();
-                Pictures++;
-                picture = true;
+                // A frame with only a mouse pointer update carries the old desktop image, not a new picture.
+                if (info.LastPresentTime != 0)
+                {
+                    Pictures++;
+                    picture = true;
+                }
             }
             else if (result != Vortice.DXGI.ResultCode.WaitTimeout) result.CheckError();
 
@@ -145,7 +150,15 @@ public static class LiveFrameSource
             {
                 _context.Unmap(_staging, 0);
             }
-            if (picture) picture = Cv2.Sum(image) != default; // protected or blind captures arrive all black
+            if (picture)
+            {
+                // Protected or blind captures arrive all black. A game that bypasses the desktop leaves the still desktop behind it:
+                // new frames keep arriving (a clock, a pointer), but the Cue regions never change.
+                // Over the regions only: a full frame (kill or live picture) is no change by itself.
+                var sum = _regions.Sum(r => { using var region = image[r]; var s = Cv2.Sum(region); return s.Val0 + s.Val1 + s.Val2; });
+                picture = sum != 0 && sum != _lastSum;
+                _lastSum = sum;
+            }
             return image;
         }
 

@@ -11,7 +11,7 @@ static class Ui
             "The config file is invalid; defaults apply. Saving in Settings overwrites it."),
         ["SinkFailed"] = ("Ein Ziel hat ein Ereignis nicht angenommen. Klicken für Details.", "A target did not accept an event. Click for details."),
         ["CaptureFailed"] = ("Die Bildschirmaufnahme ist fehlgeschlagen und wird wiederholt.", "Screen capture failed and is being retried."),
-        ["NoPicture"] = ("MatchPulse bekommt kein Bild vom Spiel. Stelle BF6 auf randloses Fenster.", "MatchPulse gets no picture of the game. Set BF6 to borderless."),
+        ["NoPicture"] = ("MatchPulse bekommt kein Bild vom Spiel. Stelle BF6 auf randloses Fenster oder starte BF6 neu.", "MatchPulse gets no picture of the game. Set BF6 to borderless or restart BF6."),
         ["MqttFailed"] = ("MQTT: Ereignis nicht gesendet. Klicken für Details.", "MQTT: an event was not sent. Click for details."),
         ["WledFailed"] = ("WLED hat eine Regel nicht ausgeführt. Klicken für Details.", "WLED did not run a rule. Click for details."),
         ["SoundFailed"] = ("Ein Sound konnte nicht abgespielt werden. Klicken für Details.", "A sound could not be played. Click for details."),

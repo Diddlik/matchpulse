@@ -25,8 +25,9 @@ public static class GameWatcher
     /// <see cref="KillPictures.DefaultFolder"/> and reported to <paramref name="killPicture"/>.
     /// <c>match_started</c> carries the Match Name read in the lobby as <c>data.mode</c> and <c>data.map</c>; names not in
     /// <see cref="Config.MatchNames"/> yet are reported to <paramref name="newMatchNames"/>.
+    /// <paramref name="preview"/> gets full frames while the live monitor's live picture is open.
     public static void Run(Func<Config> config, Action<GameEvent> dispatch, ILogger log, CancellationToken stop, Action<bool>? gameRunning = null, Action<GameEvent, string>? killPicture = null,
-        Action<IReadOnlyList<string>>? newMatchNames = null)
+        Action<IReadOnlyList<string>>? newMatchNames = null, LivePreview? preview = null)
     {
         log.LogInformation("Waiting for bf6.exe");
         while (!stop.IsCancellationRequested)
@@ -58,7 +59,7 @@ public static class GameWatcher
             var nextNameRead = DateTimeOffset.MinValue;
             var inMatch = false;
             var paused = false;
-            var warnedNoPicture = false;
+            var blind = 0;
             while (!stop.IsCancellationRequested && IsGameRunning())
             {
                 // Paused (Config.Active off): no capture and no Game Events; a running Match ends with reason "stopped".
@@ -82,12 +83,13 @@ public static class GameWatcher
                 try
                 {
                     var nextCheck = DateTimeOffset.MinValue;
-                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, [MatchNames.Region, .. snapshots is null ? [] : DiagnosticSnapshots.Regions], () => pictures.Wanted,
+                    foreach (var frame in LiveFrameSource.Read(monitor, checksPerSecond, stop, [MatchNames.Region, .. snapshots is null ? [] : DiagnosticSnapshots.Regions], () => pictures.Wanted || preview?.Wanted == true,
                         () => GetForegroundWindow() == window))
                         using (frame.Image)
                         {
                             if (!config().Active) break;
                             if (pictures.Save(frame) is { } saved) killPicture?.Invoke(saved.Kill, saved.Path);
+                            preview?.Offer(frame);
                             snapshots?.Add(frame);
                             if (!inMatch && names is not null && frame.Timestamp >= nextNameRead)
                             {
@@ -120,11 +122,14 @@ public static class GameWatcher
                 }
                 catch (TimeoutException e)
                 {
-                    // Once per game run; the capture keeps restarting quietly.
-                    if (!warnedNoPicture)
-                        log.LogWarning("No picture from monitor {Monitor} for {Seconds} s while bf6.exe is in front ({Reason}); capture restarts. Exclusive fullscreen hides the game from screen capture: use borderless",
+                    // First try quietly: have Windows redraw the game window's frame (the window only, never the game process).
+                    // Then warn once per game run; the capture keeps restarting quietly.
+                    if (++blind == 1)
+                        log.LogInformation("No picture from monitor {Monitor} while bf6.exe is in front ({Reason}): redrawing the game window and restarting capture", monitor, e.Message);
+                    else if (blind == 2)
+                        log.LogWarning("No picture from monitor {Monitor} for {Seconds} s while bf6.exe is in front ({Reason}); capture restarts. Exclusive fullscreen hides the game from screen capture: use borderless. Otherwise restart bf6.exe",
                             monitor, LiveFrameSource.NoPictureAfter.TotalSeconds, e.Message);
-                    warnedNoPicture = true;
+                    Redraw(window);
                     stop.WaitHandle.WaitOne(Poll);
                 }
                 catch (Exception e)
@@ -182,6 +187,21 @@ public static class GameWatcher
             foreach (var p in processes) p.Dispose();
         }
     }
+
+    // Recomputes the window frame and redraws it, without moving, resizing, reordering or activating it.
+    static void Redraw(IntPtr window)
+    {
+        const uint NoSize = 0x1, NoMove = 0x2, NoZOrder = 0x4, NoActivate = 0x10, FrameChanged = 0x20;
+        const uint Invalidate = 0x1, AllChildren = 0x80, Frame = 0x400;
+        SetWindowPos(window, 0, 0, 0, 0, 0, NoSize | NoMove | NoZOrder | NoActivate | FrameChanged);
+        RedrawWindow(window, 0, 0, Invalidate | AllChildren | Frame);
+    }
+
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
+    [DllImport("user32.dll")]
+    static extern bool RedrawWindow(IntPtr window, IntPtr updateRect, IntPtr updateRegion, uint flags);
 
     const uint MonitorDefaultToNearest = 2;
 

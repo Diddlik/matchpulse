@@ -69,7 +69,7 @@ sealed class TrayApp : ApplicationContext
             {
                 Status.SetGameRunning(running);
                 _hub.SetGameRunning(running);
-            }, _hub.KillPicture, LearnMatchNames))
+            }, _hub.KillPicture, LearnMatchNames, _hub.Preview))
             { IsBackground = true, Name = "Game Watcher" };
         _watcher.Start();
         _hotkey = new Hotkey(() => SetActive(!Config.Active));

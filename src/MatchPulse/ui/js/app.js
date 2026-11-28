@@ -61,7 +61,8 @@
     selEvent: null, evFilter: 'all', copied: false,
     editId: null, editDraft: '', editError: '', addKind: 'webhook', addTarget: '', addError: '',
     hexDraft: '', justSaved: false, diagIdx: 0, confirmClear: false,
-    autoRefresh: true, logFilter: 'all', plugSel: 'obs', newApp: '', liveIdx: -1, toast: ''
+    autoRefresh: true, logFilter: 'all', plugSel: 'obs', newApp: '', liveIdx: -1, toast: '',
+    livePreview: false, preview: null
   };
 
   // ---------- Abgeleitete Werte ----------
@@ -219,6 +220,7 @@
         ${B.isMock && on ? `<button type="button" class="btn" data-act="simulateKill">Demo: Kill</button>` : ''}
       </div>
       <p class="muted" style="max-width:75ch">${esc(t('live_intro'))}</p>
+      ${previewCard()}
       ${!on ? `<div class="empty stack-s" style="align-items:flex-start;gap:12px"><strong style="color:var(--text)">${esc(t('live_off'))}</strong><span class="small" style="max-width:70ch">${esc(t('live_off_d'))}</span><button type="button" class="btn primary" data-act="liveOn">${esc(t('live_toggle'))}</button></div>`
       : !n ? `<p class="muted">${esc(t('live_empty'))}</p>` : `
         <section class="card flush">
@@ -245,6 +247,21 @@
               </button>`).join('')}
           </div>
         </section>`}`;
+  }
+
+  // What the capture sees right now, about once per second while shown (not saved).
+  function previewCard() {
+    const p = S.preview;
+    return `
+        <section class="card flush">
+          <div class="row-flex" style="padding:12px 16px">
+            <strong style="flex:1 1 240px">${esc(t('live_preview'))}</strong>
+            ${S.livePreview && p ? `<span class="muted small num" data-tick="preview-at">${esc(t('live_preview_at', { t: time(p.capturedAt) }))}</span>` : ''}
+            <button type="button" class="btn s" data-act="livePreview">${esc(t(S.livePreview ? 'live_preview_hide' : 'live_preview_show'))}</button>
+          </div>
+          ${!S.livePreview ? '' : p ? `<img id="live-preview" class="diag-shot" style="border-radius:0" src="${esc(p.imageUrl)}" alt="${esc(t('live_preview'))}">`
+            : `<p class="muted small" style="padding:0 16px 12px">${esc(t('live_preview_wait'))}</p>`}
+        </section>`;
   }
 
   function pageSinks() {
@@ -660,6 +677,7 @@
     liveStep: (d) => { const n = liveHighlights().length; if (!n) return; const cur = S.liveIdx < 0 ? n - 1 : S.liveIdx; S.liveIdx = (cur + Number(d) + n) % n; },
     liveIdx: (i) => { S.liveIdx = Number(i); },
     liveWindow: () => B.send('openLiveWindow'),
+    livePreview: () => { S.livePreview = !S.livePreview; S.preview = null; if (S.livePreview) B.send('askLivePreview'); },
     simulateKill: () => B.simulateKill && B.simulateKill(),
     theme: (v) => setDraft('theme', v),
     swatch: (hex) => { setDraft('killMarkerColor', hex); S.hexDraft = hex; },
@@ -766,6 +784,8 @@
     if (e.key === 'Escape' && S.editId) { ACT.cancelEdit(); render(); }
   });
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  // The host sends the live picture only while asked, so it stops when the page or window closes.
+  setInterval(() => { if (S.livePreview && S.page === 'live') B.send('askLivePreview'); }, 1000);
   setInterval(() => { if (S.match) document.querySelectorAll('[data-tick="duration"]').forEach((n) => { n.textContent = duration(S.match.startedAt); }); }, 1000);
 
   // ---------- Nachrichten vom Host ----------
@@ -777,6 +797,7 @@
     },
     state: (p) => { S.appState = p.appState; S.match = p.match; S.since = p.since; },
     gameEvent: (ev) => { S.events = S.events.concat([ev]); if (ev.type === 'kill') S.liveIdx = -1; },
+    livePreview: (p) => { if (S.livePreview) S.preview = p; },
     killHighlight: (h) => { S.highlights = S.highlights.concat([h]); S.liveIdx = -1; },
     sinks: (list) => { S.sinks = list; },
     pluginStatus: ({ id, status, lastError, devices }) => { S.plugins = S.plugins.map((p) => (p.id === id ? Object.assign({}, p, { status, lastError: lastError || null },
@@ -789,6 +810,12 @@
     navigate: ({ page }) => { if (NAV.indexOf(page) >= 0) S.page = page; }
   };
   B.onMessage((m) => {
+    // Swap only the picture, without redrawing the page every second.
+    if (m.type === 'livePreview' && $('live-preview')) {
+      S.preview = m.payload; $('live-preview').src = m.payload.imageUrl;
+      document.querySelectorAll('[data-tick="preview-at"]').forEach((n) => { n.textContent = t('live_preview_at', { t: time(m.payload.capturedAt) }); });
+      return;
+    }
     const fn = MSG[m.type]; if (!fn) return;
     // Tippen nicht unterbrechen: Log-Zeilen nur einreihen, solange ein Textfeld den Fokus hat
     fn(m.payload);

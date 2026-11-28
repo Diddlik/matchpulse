@@ -69,6 +69,7 @@ Jede Nachricht ist `{ "type": "…", "payload": … }`. Zeiten sind ISO 8601 mit
 | `state` | `{ appState, match }` | Zustandswechsel (Spiel startet, Match beginnt/endet) |
 | `gameEvent` | Game Event, genau wie an die Ziele | bei jedem Ereignis |
 | `killHighlight` | `{ matchId, sequence, capturedAt, imageUrl }` | nach einem Kill, wenn der Live-Monitor an ist |
+| `livePreview` | `{ capturedAt, imageUrl }` (JPEG-Data-URL) | etwa jede Sekunde, solange `askLivePreview` kommt |
 | `sinks` | Liste der Ziele | nach jedem Senden (Erfolg/Fehler) |
 | `pluginStatus` | `{ id, status }` | Verbindungsänderung eines Plugins |
 | `settings` | Einstellungen | wenn sie sich außerhalb der UI ändern |
@@ -88,6 +89,7 @@ Jede Nachricht ist `{ "type": "…", "payload": … }`. Zeiten sind ISO 8601 mit
 | `savePlugin` | ein Plugin (gilt sofort) |
 | `testPlugin` | `{ id }` |
 | `setLiveMonitor` | `{ enabled }` |
+| `askLivePreview` | – (jede Sekunde, solange das Live-Bild offen ist; ohne sie endet `livePreview` nach 3 s) |
 | `openLiveWindow`, `openDiagnosticsFolder`, `clearDiagnostics` | – |
 
 ### snapshot
